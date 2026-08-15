@@ -1,0 +1,59 @@
+{
+ "extDescription": {
+  "message": "ブックマークを表示するミニマルな新しいタブページ"
+ },
+ "newTabTitle": {
+  "message": "新しいタブ"
+ },
+ "edit": {
+  "message": "編集"
+ },
+ "settings": {
+  "message": "設定"
+ },
+ "resetToDefault": {
+  "message": "既定値に戻す"
+ },
+ "rootFolder": {
+  "message": "ルートフォルダー"
+ },
+ "topLevelFolders": {
+  "message": "最上位フォルダー"
+ },
+ "rememberOpenFolders": {
+  "message": "開いたフォルダーを記憶"
+ },
+ "font": {
+  "message": "フォント"
+ },
+ "fontSize": {
+  "message": "フォントサイズ"
+ },
+ "fontSystem": {
+  "message": "システム"
+ },
+ "fontSansSerif": {
+  "message": "サンセリフ"
+ },
+ "fontSerif": {
+  "message": "セリフ"
+ },
+ "fontMonospace": {
+  "message": "等幅"
+ },
+ "defaultValue": {
+  "message": "既定"
+ },
+ "permissionRequest": {
+  "message": "ブックマークのアイコンをキャッシュするには、GNTP がブックマーク先のサイトへアクセスする必要があります。"
+ },
+ "allow": {
+  "message": "許可"
+ },
+ "browserDefault": {
+  "message": "ブラウザーの既定"
+ },
+ "language": {
+  "message": "言語"
+ }
+}

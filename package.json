@@ -1,0 +1,14 @@
+{
+	"name": "gntp",
+	"version": "1.0.0",
+	"private": true,
+	"description": "Minimal new tab page with bookmarks",
+	"license": "MIT",
+	"scripts": {
+		"build": "./build.sh",
+		"check": "tsc -p tsconfig.json --noEmit"
+	},
+	"devDependencies": {
+		"typescript": "~5.7.3"
+	}
+}

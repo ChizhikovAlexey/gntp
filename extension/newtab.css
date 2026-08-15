@@ -1,0 +1,305 @@
+:root {
+	/* Opt into both schemes: without this, system colors (Canvas,
+	   CanvasText, LinkText) always resolve to the light palette. */
+	color-scheme: light dark;
+}
+body {
+	/* The browser's own menu/UI font — the "Browser default" choice.
+	   The Font settings override family/size via inline styles
+	   (see apply_font), which beat this shorthand in the cascade. */
+	font: menu;
+	/* Colors resolved by the browser for its current scheme. */
+	background: Canvas;
+	color: CanvasText;
+}
+#main {
+	display: flex;
+	align-items: flex-start;
+	/* Relative to the font size; 2 is HNTP's default item spacing. */
+	line-height: 2;
+	/* HNTP's default framing: the block of columns is centered with
+	   margins around it; rows inside stay left-aligned. */
+	width: 80%;
+	margin: 5% auto 0;
+}
+#main a {
+	/* Links look like ordinary text: the browser's CanvasText color
+	   inherited from body — no link-blue, no visited-purple, no underlines. */
+	color: inherit;
+	text-decoration: none;
+}
+.column {
+	flex: 1;
+	min-width: 0;
+}
+ul {
+	list-style: none;
+}
+/* Indentation comes from each row's own left padding (the gutter for
+   the eye and drag handle), not from the lists: this keeps the controls
+   inside the row's box, so hover, the card and the drag snapshot all
+   agree on its geometry. */
+#main ul {
+	padding-inline-start: 0;
+}
+/* Favicon slot: fixed 16px box so rows align with or without an icon. */
+.favicon {
+	display: inline-block;
+	width: 16px;
+	height: 16px;
+	margin: -3px .4em 0 0;
+	vertical-align: middle;
+}
+/* Settings, top-right: a lone edit pencil; in edit mode a gear appears
+   next to it, and only the gear unfolds the panel of "name — control —
+   reset" rows. All colors derive from the theme palette
+   (Canvas/CanvasText), never hardcoded. */
+#settings {
+	position: fixed;
+	top: 8px;
+	right: 8px;
+	text-align: right;
+}
+/* The settings popover: the browser manages opening, light dismiss and
+   Esc (popovertarget on the gear); only look and placement are ours. */
+#settings-panel {
+	position: fixed;
+	inset: 3.2em 8px auto auto;
+	margin: 0;
+	background: Canvas;
+	border: 1px solid color-mix(in srgb, CanvasText 25%, transparent);
+	border-radius: 8px;
+	padding: 10px;
+	box-shadow: 0 2px 8px color-mix(in srgb, CanvasText 15%, transparent);
+	/* Shared columns — name, control, reset — sized independently:
+	   they can never intersect. */
+	grid-template-columns: max-content auto max-content;
+	gap: 8px 16px;
+	align-items: center;
+}
+#settings-panel:popover-open {
+	display: grid;
+}
+#edit-toggle,
+#settings-toggle {
+	border: none;
+	background: none;
+	font: inherit;
+	font-size: 1.25em;
+	color: inherit;
+	cursor: pointer;
+	opacity: 0.4;
+	padding: 2px 8px;
+	border-radius: 6px;
+}
+#edit-toggle:hover,
+#settings-toggle:hover {
+	opacity: 1;
+}
+#main.editing ~ #settings #edit-toggle {
+	opacity: 1;
+	background: color-mix(in srgb, CanvasText 12%, transparent);
+}
+/* The gear exists only in edit mode; it highlights while the panel is open. */
+#settings-toggle {
+	display: none;
+}
+#main.editing ~ #settings #settings-toggle {
+	display: inline-block;
+	margin-right: 6px;
+}
+#settings:has(#settings-panel:popover-open) #settings-toggle {
+	opacity: 1;
+	background: color-mix(in srgb, CanvasText 12%, transparent);
+}
+#settings .row {
+	/* The row's name, control and reset become items of the panel grid. */
+	display: contents;
+	white-space: nowrap;
+}
+#settings .row > span:first-child {
+	opacity: 0.7;
+	justify-self: start;
+	text-align: left;
+}
+#settings .row > select {
+	/* Fixed width: the panel never resizes when option texts change
+	   (the open dropdown sizes itself to the options independently). */
+	width: 14em;
+	justify-self: start;
+}
+#settings .row > input {
+	max-width: 14em;
+	justify-self: start;
+}
+/* Checkboxes drawn as switches: still native inputs (semantics,
+   keyboard, label clicks intact) — appearance: none plus a track and a
+   knob. AccentColor/Canvas keep it theme-native without hardcoding. */
+#settings .row input[type="checkbox"] {
+	appearance: none;
+	margin: 0;
+	width: 2.2em;
+	height: 1.2em;
+	border-radius: 0.6em;
+	background: color-mix(in srgb, CanvasText 30%, transparent);
+	position: relative;
+	cursor: pointer;
+	transition: background-color 0.15s;
+}
+#settings .row input[type="checkbox"]::before {
+	content: "";
+	position: absolute;
+	top: 0.15em;
+	left: 0.15em;
+	width: 0.9em;
+	height: 0.9em;
+	border-radius: 50%;
+	background: Canvas;
+	transition: left 0.15s;
+}
+#settings .row input[type="checkbox"]:checked {
+	background: AccentColor;
+}
+#settings .row input[type="checkbox"]:checked::before {
+	left: calc(100% - 1.05em);
+}
+
+/* First-run banner asking for the icon-cache host permission. */
+#permission-banner {
+	position: fixed;
+	top: 8px;
+	left: 50%;
+	transform: translateX(-50%);
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	background: Canvas;
+	border: 1px solid color-mix(in srgb, CanvasText 25%, transparent);
+	border-radius: 8px;
+	padding: 8px 12px;
+	box-shadow: 0 2px 8px color-mix(in srgb, CanvasText 15%, transparent);
+}
+#permission-banner .dismiss {
+	border: none;
+	background: none;
+	font: inherit;
+	color: inherit;
+	cursor: pointer;
+	opacity: 0.4;
+}
+#permission-banner .dismiss:hover {
+	opacity: 1;
+}
+
+/* Per-row reset-to-default control. */
+#settings .reset {
+	border: none;
+	background: none;
+	font: inherit;
+	color: inherit;
+	cursor: pointer;
+	opacity: 0.4;
+	padding: 0 2px;
+}
+#settings .reset:hover {
+	opacity: 1;
+}
+/* Hidden while the value matches the default; keeps its grid cell. */
+#settings .reset.off {
+	visibility: hidden;
+}
+/* Column folder titles hidden by the setting, in every mode — the
+   column's controls live on the card, not on the title row. */
+#main.no-titles .column > ul > li > .folder {
+	display: none;
+}
+
+/* Collapsible folders: the header carries a disclosure marker sized
+   like a favicon (so folder titles align with bookmark titles), and a
+   collapsed folder hides its list. */
+#main .folder {
+	cursor: pointer;
+}
+#main .folder::before {
+	content: "▾";
+	display: inline-block;
+	width: 16px;
+	margin-right: 0.4em;
+	text-align: center;
+	opacity: 0.6;
+}
+#main li.collapsed > .folder::before {
+	content: "▸";
+}
+#main li.collapsed > ul {
+	display: none;
+}
+/* A column root whose title is hidden has no way to be toggled — its
+   collapsed state is ignored so the column can never vanish entirely. */
+#main.no-titles .column > ul > li.collapsed > ul {
+	display: block;
+}
+
+/* A row: the link is a full-width block, the nested folder list flows
+   below it; the eye and handle live absolutely positioned in the
+   row's left padding (the gutter), so no flex tricks are needed. */
+#main li {
+	position: relative;
+	/* The gutter: one indentation step, hosting the eye and the handle. */
+	padding-left: 3.5em;
+}
+#main li > a {
+	display: block;
+	/* One line per row; truncated titles get a tooltip (update_tooltips). */
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+/* Links are inert while editing: clicks (any button) go nowhere and the
+   cursor stays an arrow — hovering still reaches the li card. */
+#main.editing a[href] {
+	pointer-events: none;
+}
+
+/* One uniform card model: every li (bookmark row, folder block, column
+   root) is a card; hovering the innermost li shows the backdrop and its
+   two gutter controls, vertically centered left of the card. */
+.dragging,
+#main.editing:not(:has(.dragging)) li:hover:not(:has(li:hover)) {
+	background: color-mix(in srgb, Canvas 60%, transparent);
+	outline: 1px solid color-mix(in srgb, CanvasText 25%, transparent);
+	border-radius: 6px;
+}
+
+.hide-toggle,
+.drag-handle {
+	display: none;
+	position: absolute;
+	top: 50%;
+	transform: translateY(-50%);
+	user-select: none;
+	opacity: 0;
+}
+.hide-toggle {
+	left: 0.7em;
+	cursor: pointer;
+}
+.drag-handle {
+	left: 2.3em;
+	cursor: grab;
+}
+#main.editing .hide-toggle,
+#main.editing .drag-handle {
+	display: inline;
+}
+#main.editing:not(:has(.dragging)) li:hover:not(:has(li:hover)) > .hide-toggle,
+#main.editing:not(:has(.dragging)) li:hover:not(:has(li:hover)) > .drag-handle {
+	opacity: 1;
+}
+/* Hidden folders exist in the DOM but show only in edit mode. */
+#main:not(.editing) .hidden {
+	display: none;
+}
+#main.editing .hidden {
+	opacity: 0.5;
+}

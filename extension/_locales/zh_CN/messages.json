@@ -1,0 +1,59 @@
+{
+ "extDescription": {
+  "message": "极简的新标签页，展示您的书签"
+ },
+ "newTabTitle": {
+  "message": "新标签页"
+ },
+ "edit": {
+  "message": "编辑"
+ },
+ "settings": {
+  "message": "设置"
+ },
+ "resetToDefault": {
+  "message": "恢复默认值"
+ },
+ "rootFolder": {
+  "message": "根文件夹"
+ },
+ "topLevelFolders": {
+  "message": "顶级文件夹"
+ },
+ "rememberOpenFolders": {
+  "message": "记住展开的文件夹"
+ },
+ "font": {
+  "message": "字体"
+ },
+ "fontSize": {
+  "message": "字号"
+ },
+ "fontSystem": {
+  "message": "系统"
+ },
+ "fontSansSerif": {
+  "message": "无衬线"
+ },
+ "fontSerif": {
+  "message": "衬线"
+ },
+ "fontMonospace": {
+  "message": "等宽"
+ },
+ "defaultValue": {
+  "message": "默认"
+ },
+ "permissionRequest": {
+  "message": "要缓存书签图标，GNTP 需要访问已收藏的网站。"
+ },
+ "allow": {
+  "message": "允许"
+ },
+ "browserDefault": {
+  "message": "浏览器默认"
+ },
+ "language": {
+  "message": "语言"
+ }
+}

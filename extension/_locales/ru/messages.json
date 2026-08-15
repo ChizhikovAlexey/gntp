@@ -1,0 +1,59 @@
+{
+ "extDescription": {
+  "message": "Минималистичная новая вкладка с закладками"
+ },
+ "newTabTitle": {
+  "message": "Новая вкладка"
+ },
+ "edit": {
+  "message": "Редактировать"
+ },
+ "settings": {
+  "message": "Настройки"
+ },
+ "resetToDefault": {
+  "message": "Сбросить к значению по умолчанию"
+ },
+ "rootFolder": {
+  "message": "Корневая папка"
+ },
+ "topLevelFolders": {
+  "message": "Папки верхнего уровня"
+ },
+ "rememberOpenFolders": {
+  "message": "Помнить раскрытые папки"
+ },
+ "font": {
+  "message": "Шрифт"
+ },
+ "fontSize": {
+  "message": "Размер шрифта"
+ },
+ "fontSystem": {
+  "message": "Системный"
+ },
+ "fontSansSerif": {
+  "message": "Без засечек"
+ },
+ "fontSerif": {
+  "message": "С засечками"
+ },
+ "fontMonospace": {
+  "message": "Моноширинный"
+ },
+ "defaultValue": {
+  "message": "по умолчанию"
+ },
+ "permissionRequest": {
+  "message": "Чтобы кэшировать значки закладок, GNTP нужен доступ к сайтам из закладок."
+ },
+ "allow": {
+  "message": "Разрешить"
+ },
+ "browserDefault": {
+  "message": "Браузерный по умолчанию"
+ },
+ "language": {
+  "message": "Язык"
+ }
+}

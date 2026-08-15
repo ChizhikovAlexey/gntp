@@ -1,0 +1,59 @@
+{
+ "extDescription": {
+  "message": "Página de nueva pestaña minimalista con marcadores"
+ },
+ "newTabTitle": {
+  "message": "Nueva pestaña"
+ },
+ "edit": {
+  "message": "Editar"
+ },
+ "settings": {
+  "message": "Ajustes"
+ },
+ "resetToDefault": {
+  "message": "Restablecer valor predeterminado"
+ },
+ "rootFolder": {
+  "message": "Carpeta raíz"
+ },
+ "topLevelFolders": {
+  "message": "Carpetas de nivel superior"
+ },
+ "rememberOpenFolders": {
+  "message": "Recordar carpetas abiertas"
+ },
+ "font": {
+  "message": "Fuente"
+ },
+ "fontSize": {
+  "message": "Tamaño de fuente"
+ },
+ "fontSystem": {
+  "message": "Del sistema"
+ },
+ "fontSansSerif": {
+  "message": "Sans-serif"
+ },
+ "fontSerif": {
+  "message": "Serif"
+ },
+ "fontMonospace": {
+  "message": "Monoespaciada"
+ },
+ "defaultValue": {
+  "message": "predeterminado"
+ },
+ "permissionRequest": {
+  "message": "Para almacenar en caché los iconos de los marcadores, GNTP necesita acceso a los sitios guardados."
+ },
+ "allow": {
+  "message": "Permitir"
+ },
+ "browserDefault": {
+  "message": "Predeterminada del navegador"
+ },
+ "language": {
+  "message": "Idioma"
+ }
+}

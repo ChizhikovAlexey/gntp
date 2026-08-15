@@ -1,0 +1,59 @@
+{
+ "extDescription": {
+  "message": "Page nouvel onglet minimaliste avec marque-pages"
+ },
+ "newTabTitle": {
+  "message": "Nouvel onglet"
+ },
+ "edit": {
+  "message": "Modifier"
+ },
+ "settings": {
+  "message": "Paramètres"
+ },
+ "resetToDefault": {
+  "message": "Réinitialiser la valeur par défaut"
+ },
+ "rootFolder": {
+  "message": "Dossier racine"
+ },
+ "topLevelFolders": {
+  "message": "Dossiers de premier niveau"
+ },
+ "rememberOpenFolders": {
+  "message": "Mémoriser les dossiers ouverts"
+ },
+ "font": {
+  "message": "Police"
+ },
+ "fontSize": {
+  "message": "Taille de police"
+ },
+ "fontSystem": {
+  "message": "Système"
+ },
+ "fontSansSerif": {
+  "message": "Sans empattement"
+ },
+ "fontSerif": {
+  "message": "Avec empattement"
+ },
+ "fontMonospace": {
+  "message": "À chasse fixe"
+ },
+ "defaultValue": {
+  "message": "par défaut"
+ },
+ "permissionRequest": {
+  "message": "Pour mettre en cache les icônes des marque-pages, GNTP doit accéder aux sites enregistrés."
+ },
+ "allow": {
+  "message": "Autoriser"
+ },
+ "browserDefault": {
+  "message": "Par défaut du navigateur"
+ },
+ "language": {
+  "message": "Langue"
+ }
+}

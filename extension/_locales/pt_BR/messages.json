@@ -1,0 +1,59 @@
+{
+ "extDescription": {
+  "message": "Página de nova aba minimalista com favoritos"
+ },
+ "newTabTitle": {
+  "message": "Nova aba"
+ },
+ "edit": {
+  "message": "Editar"
+ },
+ "settings": {
+  "message": "Configurações"
+ },
+ "resetToDefault": {
+  "message": "Redefinir para o padrão"
+ },
+ "rootFolder": {
+  "message": "Pasta raiz"
+ },
+ "topLevelFolders": {
+  "message": "Pastas de nível superior"
+ },
+ "rememberOpenFolders": {
+  "message": "Lembrar pastas abertas"
+ },
+ "font": {
+  "message": "Fonte"
+ },
+ "fontSize": {
+  "message": "Tamanho da fonte"
+ },
+ "fontSystem": {
+  "message": "Do sistema"
+ },
+ "fontSansSerif": {
+  "message": "Sem serifa"
+ },
+ "fontSerif": {
+  "message": "Com serifa"
+ },
+ "fontMonospace": {
+  "message": "Monoespaçada"
+ },
+ "defaultValue": {
+  "message": "padrão"
+ },
+ "permissionRequest": {
+  "message": "Para armazenar em cache os ícones dos favoritos, o GNTP precisa de acesso aos sites salvos."
+ },
+ "allow": {
+  "message": "Permitir"
+ },
+ "browserDefault": {
+  "message": "Padrão do navegador"
+ },
+ "language": {
+  "message": "Idioma"
+ }
+}

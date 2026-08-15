@@ -1,0 +1,59 @@
+{
+ "extDescription": {
+  "message": "Minimalistische Neuer-Tab-Seite mit Lesezeichen"
+ },
+ "newTabTitle": {
+  "message": "Neuer Tab"
+ },
+ "edit": {
+  "message": "Bearbeiten"
+ },
+ "settings": {
+  "message": "Einstellungen"
+ },
+ "resetToDefault": {
+  "message": "Auf Standard zurücksetzen"
+ },
+ "rootFolder": {
+  "message": "Wurzelordner"
+ },
+ "topLevelFolders": {
+  "message": "Ordner der obersten Ebene"
+ },
+ "rememberOpenFolders": {
+  "message": "Geöffnete Ordner merken"
+ },
+ "font": {
+  "message": "Schriftart"
+ },
+ "fontSize": {
+  "message": "Schriftgröße"
+ },
+ "fontSystem": {
+  "message": "System"
+ },
+ "fontSansSerif": {
+  "message": "Serifenlos"
+ },
+ "fontSerif": {
+  "message": "Mit Serifen"
+ },
+ "fontMonospace": {
+  "message": "Monospace"
+ },
+ "defaultValue": {
+  "message": "Standard"
+ },
+ "permissionRequest": {
+  "message": "Um Lesezeichen-Symbole zwischenzuspeichern, benötigt GNTP Zugriff auf die gespeicherten Websites."
+ },
+ "allow": {
+  "message": "Erlauben"
+ },
+ "browserDefault": {
+  "message": "Browser-Standard"
+ },
+ "language": {
+  "message": "Sprache"
+ }
+}

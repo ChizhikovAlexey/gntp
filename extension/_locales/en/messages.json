@@ -1,0 +1,59 @@
+{
+ "extDescription": {
+  "message": "Minimal new tab page with bookmarks"
+ },
+ "newTabTitle": {
+  "message": "New Tab"
+ },
+ "edit": {
+  "message": "Edit"
+ },
+ "settings": {
+  "message": "Settings"
+ },
+ "resetToDefault": {
+  "message": "Reset to default"
+ },
+ "rootFolder": {
+  "message": "Root folder"
+ },
+ "topLevelFolders": {
+  "message": "Top level folders"
+ },
+ "rememberOpenFolders": {
+  "message": "Remember open folders"
+ },
+ "font": {
+  "message": "Font"
+ },
+ "fontSize": {
+  "message": "Font size"
+ },
+ "fontSystem": {
+  "message": "System"
+ },
+ "fontSansSerif": {
+  "message": "Sans-serif"
+ },
+ "fontSerif": {
+  "message": "Serif"
+ },
+ "fontMonospace": {
+  "message": "Monospace"
+ },
+ "defaultValue": {
+  "message": "default"
+ },
+ "permissionRequest": {
+  "message": "To cache bookmark icons, GNTP needs access to the bookmarked sites."
+ },
+ "allow": {
+  "message": "Allow"
+ },
+ "browserDefault": {
+  "message": "Browser default"
+ },
+ "language": {
+  "message": "Language"
+ }
+}
