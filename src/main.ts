@@ -10,7 +10,7 @@ import {
 	t,
 	uiLanguage,
 } from "./api.js";
-import { editMode, initColumnDnd, loadOrder, makeDraggable, setEditMode } from "./dnd.js";
+import { editMode, initColumnDnd, loadLayout, makeDraggable, normalizeRows, setEditMode } from "./dnd.js";
 import { clearFolds, deviations, persistFolds } from "./folds.js";
 import { initFolds } from "./folds.js";
 import { initHidden, loadHidden } from "./hidden.js";
@@ -71,6 +71,8 @@ const LANGUAGES: readonly (readonly [string, string])[] = [
 	["zh_CN", "简体中文"],
 ];
 
+const DEFAULT_MAX_COLUMNS = 5;
+
 const main = document.getElementById("main") as HTMLElement;
 
 /** Everything render functions need besides the node at hand. */
@@ -83,7 +85,7 @@ interface Render {
 await initLocale(storageGet("lang"));
 document.title = t("newTabTitle");
 initItems(main, rebuild);
-initColumnDnd(main);
+initColumnDnd(main, maxColumns, () => void rebuild());
 initHidden(main);
 initFolds(main, (li, id) => void expandFolder(li, id));
 hideBrokenIcons();
@@ -119,18 +121,36 @@ async function rebuild(): Promise<void> {
 		}
 	}
 
-	const saved = loadOrder();
-	const position = (id: string): number => {
-		const index = saved.indexOf(id);
-		return index < 0 ? Number.MAX_SAFE_INTEGER : index;
-	};
-	columns.sort(([a], [b]) => position(a) - position(b));
-
+	const byId = new Map(columns);
 	for (const [id, column] of columns) {
-		main.append(column);
 		const rootLi = column.querySelector("li");
 		if (rootLi !== null) makeDraggable(column, id, rootLi);
 	}
+
+	// Saved rows first (unknown ids dropped), then any new columns
+	// appended to the last row; the row limit is enforced afterwards.
+	const placed = new Set<string>();
+	const rows: string[][] = [];
+	for (const row of loadLayout()) {
+		const ids = row.filter((id) => byId.has(id) && !placed.has(id));
+		for (const id of ids) placed.add(id);
+		if (ids.length > 0) rows.push(ids);
+	}
+	const missing = columns.map(([id]) => id).filter((id) => !placed.has(id));
+	if (missing.length > 0) {
+		if (rows.length === 0) rows.push([]);
+		rows[rows.length - 1]?.push(...missing);
+	}
+
+	for (const ids of rows) {
+		const row = createEl("div", "grid-row");
+		for (const id of ids) {
+			const column = byId.get(id);
+			if (column !== undefined) row.append(column);
+		}
+		main.append(row);
+	}
+	normalizeRows(main, maxColumns());
 
 	if (isFirefox) {
 		icons.flushPrefetch();
@@ -391,6 +411,7 @@ function buildSettingsUi(): void {
 				if (on) persistFolds();
 				else clearFolds();
 			});
+			addMaxColumnsSetting(panel);
 			addFontSettings(panel);
 			addLanguageSetting(panel);
 			void getTree().then((root) => fillRootSelector(root, selectedRoot(root).id));
@@ -574,6 +595,35 @@ function styleRootOptions(select: HTMLSelectElement, open: boolean): void {
 		const selected = option.value === select.value;
 		option.textContent = selected && !open ? label : indented;
 	}
+}
+
+/** How many columns fit in one matrix row before wrapping. */
+function maxColumns(): number {
+	const value = Number(storageGet("max_cols"));
+	return Number.isInteger(value) && value >= 1 && value <= 12
+		? value
+		: DEFAULT_MAX_COLUMNS;
+}
+
+/** "Columns per row": the matrix width, stored under "max_cols". */
+function addMaxColumnsSetting(panel: HTMLElement): void {
+	const input = createEl("input");
+	input.type = "number";
+	input.min = "1";
+	input.max = "12";
+	input.placeholder = String(DEFAULT_MAX_COLUMNS);
+	input.value = storageGet("max_cols") ?? "";
+	const resetBtn = addSettingRow(panel, t("maxColumns"), input, () => {
+		storageRemove("max_cols");
+		input.value = "";
+		void rebuild();
+	});
+	syncReset(resetBtn, maxColumns() === DEFAULT_MAX_COLUMNS);
+	input.addEventListener("change", () => {
+		storageSet("max_cols", input.value);
+		void rebuild();
+		syncReset(resetBtn, maxColumns() === DEFAULT_MAX_COLUMNS);
+	});
 }
 
 /** Applies the stored font settings as inline styles on <body>. */

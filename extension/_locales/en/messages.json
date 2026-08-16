@@ -55,5 +55,8 @@
  },
  "language": {
   "message": "Language"
+ },
+ "maxColumns": {
+  "message": "Columns per row"
  }
 }

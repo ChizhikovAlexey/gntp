@@ -55,5 +55,8 @@
  },
  "language": {
   "message": "言語"
+ },
+ "maxColumns": {
+  "message": "1行の列数"
  }
 }

@@ -13,14 +13,20 @@ body {
 	color: CanvasText;
 }
 #main {
-	display: flex;
-	align-items: flex-start;
 	/* Relative to the font size; 2 is HNTP's default item spacing. */
 	line-height: 2;
-	/* HNTP's default framing: the block of columns is centered with
-	   margins around it; rows inside stay left-aligned. */
-	width: 80%;
-	margin: 5% auto 0;
+	margin: 5vh 0 4vh;
+	padding: 0 24px;
+}
+/* One matrix row: centered, columns sized by their content with air
+   between them; when the window is too narrow, columns shrink (rows
+   get ellipsis) instead of overflowing — no horizontal scrolling. */
+.grid-row {
+	display: flex;
+	justify-content: center;
+	align-items: flex-start;
+	gap: 3.5em;
+	margin-bottom: 2em;
 }
 #main a {
 	/* Links look like ordinary text: the browser's CanvasText color
@@ -29,7 +35,7 @@ body {
 	text-decoration: none;
 }
 .column {
-	flex: 1;
+	flex: 0 1 auto;
 	min-width: 0;
 }
 ul {
@@ -245,8 +251,10 @@ ul {
    row's left padding (the gutter), so no flex tricks are needed. */
 #main li {
 	position: relative;
-	/* The gutter: one indentation step, hosting the eye and the handle. */
+	/* The gutter: one indentation step, hosting the eye and the handle;
+	   the right padding balances the card backdrop around the text. */
 	padding-left: 3.5em;
+	padding-right: 1em;
 }
 #main li > a {
 	display: block;

@@ -1,16 +1,16 @@
-// Drag and drop reordering of columns, with the order persisted in
-// localStorage under the "columns" key (comma-separated folder ids).
+// Drag and drop of columns across the row matrix. The layout persists
+// in localStorage under "columns" as rows of comma-separated ids joined
+// with "|" (a legacy comma-only value reads as a single row).
 //
-// Columns are reordered live while dragging (the DOM is updated on
-// dragover as a preview); drop commits the order, a cancelled drag
-// (Esc / dropped outside) restores the original position. Listeners are
-// delegated to #main — four in total, independent of the column count.
+// The matrix is reordered live while dragging: hovering a column
+// inserts next to it; dragging past the bottom edge of the last row
+// previews a new tail row. Drop commits (cascading overflow past the
+// row limit), a cancelled drag restores the saved layout. Listeners are delegated to
+// #main — four in total, independent of the column count.
 
-import { createEl, loadCsv, saveCsv, setClass, targetElement } from "./util.js";
+import { createEl, setClass, storageGet, storageSet, targetElement } from "./util.js";
 
 let dragged: HTMLElement | null = null;
-// The dragged column's next sibling, to undo the preview on cancel.
-let origNext: Element | null = null;
 let dropped = false;
 let editing = false;
 
@@ -27,17 +27,48 @@ export function setEditMode(main: HTMLElement, enabled: boolean): void {
 	setClass(main, "editing", enabled);
 }
 
-export function loadOrder(): string[] {
-	return loadCsv("columns");
+/** The saved matrix: rows of column ids. */
+export function loadLayout(): string[][] {
+	const raw = storageGet("columns");
+	if (raw === null || raw === "") return [];
+	return raw.split("|").map((row) => row.split(",").filter((id) => id !== ""));
 }
 
-function saveOrder(main: HTMLElement): void {
-	const ids: string[] = [];
-	for (const el of main.children) {
-		const id = el.getAttribute("data-id");
-		if (id !== null) ids.push(id);
+function saveLayout(main: HTMLElement): void {
+	const rows: string[] = [];
+	for (const row of main.querySelectorAll(".grid-row")) {
+		const ids: string[] = [];
+		for (const column of row.children) {
+			const id = column.getAttribute("data-id");
+			if (id !== null) ids.push(id);
+		}
+		if (ids.length > 0) rows.push(ids.join(","));
 	}
-	saveCsv("columns", ids);
+	storageSet("columns", rows.join("|"));
+}
+
+/**
+ * Enforces the row limit by cascading overflowing columns into the next
+ * row, and drops empty rows.
+ */
+export function normalizeRows(main: HTMLElement, cap: number): void {
+	const rows = [...main.querySelectorAll<HTMLElement>(".grid-row")];
+	for (let i = 0; i < rows.length; i++) {
+		const row = rows[i];
+		if (row === undefined) continue;
+		while (row.children.length > cap) {
+			let next = rows[i + 1];
+			if (next === undefined) {
+				next = createEl("div", "grid-row");
+				main.append(next);
+				rows.push(next);
+			}
+			const overflow = row.lastElementChild;
+			if (overflow === null) break;
+			next.insertBefore(overflow, next.firstChild);
+		}
+	}
+	for (const row of rows) if (row.children.length === 0) row.remove();
 }
 
 /** Marks a column as draggable by the handle placed in its root row. */
@@ -50,7 +81,11 @@ export function makeDraggable(column: HTMLElement, id: string, rootLi: Element):
 }
 
 /** The four delegated listeners; call once. */
-export function initColumnDnd(main: HTMLElement): void {
+export function initColumnDnd(
+	main: HTMLElement,
+	rowLimit: () => number,
+	restore: () => void,
+): void {
 	main.addEventListener("dragstart", (e) => {
 		const target = targetElement(e);
 		if (target === null || !target.classList.contains("column-handle")) return;
@@ -68,36 +103,65 @@ export function initColumnDnd(main: HTMLElement): void {
 			e.dataTransfer.setDragImage(column, e.clientX - rect.left, e.clientY - rect.top);
 		}
 		dragged = column;
-		origNext = column.nextElementSibling;
 		dropped = false;
 	});
 
-	main.addEventListener("dragover", (e) => {
+	// On document, not #main: the tail-row preview lives below #main's
+	// box, and the drop must be allowed there too.
+	document.addEventListener("dragover", (e) => {
 		if (dragged === null) return;
-		const column = targetElement(e)?.closest<HTMLElement>(".column");
-		if (column === null || column === undefined) return;
 		e.preventDefault();
-		if (column === dragged) return;
-		const rect = column.getBoundingClientRect();
-		const after = e.clientX > rect.left + rect.width / 2;
-		main.insertBefore(dragged, after ? column.nextElementSibling : column);
+		const over = targetElement(e)?.closest<HTMLElement>(".column");
+		if (over !== null && over !== undefined) {
+			if (over === dragged) return;
+			// Left half inserts before the hovered column, right half after.
+			const rect = over.getBoundingClientRect();
+			const after = e.clientX > rect.left + rect.width / 2;
+			moveInto(over.parentElement, after ? over.nextElementSibling : over);
+			// Cascade the row-limit overflow live, as part of the preview.
+			normalizeRows(main, rowLimit());
+		} else {
+			// A new row appears only when the pointer actually leaves the
+			// matrix past its bottom edge; never above the first row.
+			previewTailRow(main, e.clientY);
+		}
 	});
 
-	main.addEventListener("drop", (e) => {
+	document.addEventListener("drop", (e) => {
 		if (dragged === null) return;
 		e.preventDefault();
 		dropped = true;
-		saveOrder(main);
+		normalizeRows(main, rowLimit());
+		saveLayout(main);
 	});
 
 	main.addEventListener("dragend", (e) => {
 		if (targetElement(e)?.classList.contains("column-handle") !== true) return;
 		if (dragged !== null) {
 			dragged.classList.remove("dragging");
-			if (!dropped) main.insertBefore(dragged, origNext);
+			if (!dropped) restore();
 		}
 		dragged = null;
-		origNext = null;
 		dropped = false;
 	});
+}
+
+/** Moves the dragged column, pruning its old row if that empties it. */
+function moveInto(row: Element | null, before: Element | null): void {
+	if (dragged === null || row === null) return;
+	const from = dragged.parentElement;
+	row.insertBefore(dragged, before);
+	if (from !== null && from !== row && from.children.length === 0) from.remove();
+}
+
+function previewTailRow(main: HTMLElement, y: number): void {
+	if (dragged === null) return;
+	const last = main.querySelector<HTMLElement>(".grid-row:last-of-type");
+	if (last === null || y <= last.getBoundingClientRect().bottom) return;
+	// Already the sole occupant of the last row: nothing to do.
+	const current = dragged.parentElement;
+	if (current === last && last.children.length === 1) return;
+	const row = createEl("div", "grid-row");
+	main.append(row);
+	moveInto(row, null);
 }
