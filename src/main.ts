@@ -11,8 +11,8 @@ import {
 	uiLanguage,
 } from "./api.js";
 import { editMode, initColumnDnd, loadLayout, makeDraggable, normalizeRows, setEditMode } from "./dnd.js";
-import { clearFolds, deviations, persistFolds } from "./folds.js";
-import { initFolds } from "./folds.js";
+import { fitAir } from "./fit.js";
+import { clearFolds, deviations, initFolds, persistFolds } from "./folds.js";
 import { initHidden, loadHidden } from "./hidden.js";
 import * as icons from "./icons.js";
 import { initItems } from "./items.js";
@@ -85,11 +85,11 @@ interface Render {
 await initLocale(storageGet("lang"));
 document.title = t("newTabTitle");
 initItems(main, rebuild);
-initColumnDnd(main, maxColumns, () => void rebuild());
+initColumnDnd(main, maxColumns, () => void rebuild(), relayout);
 initHidden(main);
-initFolds(main, (li, id) => void expandFolder(li, id));
+initFolds(main, (li, id) => void expandFolder(li, id), relayout);
 hideBrokenIcons();
-addEventListener("resize", updateTooltips);
+addEventListener("resize", relayout);
 buildSettingsUi();
 applyFont();
 await rebuild();
@@ -156,7 +156,7 @@ async function rebuild(): Promise<void> {
 		icons.flushPrefetch();
 		setTimeout(() => void icons.shrinkLegacyEntries(), 1000);
 	}
-	updateTooltips();
+	relayout();
 }
 
 /**
@@ -313,7 +313,7 @@ async function expandFolder(li: HTMLElement, id: string): Promise<void> {
 	const inner = createEl("ul");
 	for (const child of node.children) renderNode(ctx, inner, child, true);
 	li.append(inner);
-	updateTooltips();
+	relayout();
 	if (isFirefox) icons.flushPrefetch();
 }
 
@@ -367,9 +367,18 @@ function hideBrokenIcons(): void {
 }
 
 /**
+ * Re-measures what depends on how much room the page has: the air in
+ * the cards, then the truncation it leaves. Call after any change to
+ * widths or to what is displayed.
+ */
+function relayout(): void {
+	fitAir(main);
+	updateTooltips();
+}
+
+/**
  * Gives truncated titles a tooltip with the full text; rows that fit
- * get none. Re-run whenever widths may have changed (render, window
- * resize, font change).
+ * get none.
  */
 function updateTooltips(): void {
 	for (const a of main.querySelectorAll<HTMLElement>("li > a")) {
@@ -446,6 +455,8 @@ function addEditToggle(head: HTMLElement, panel: HTMLElement): void {
 		const enabled = !editMode();
 		setEditMode(main, enabled);
 		if (!enabled) panel.hidePopover();
+		// Edit mode reveals the hidden rows, which can widen the matrix.
+		relayout();
 	});
 }
 
@@ -632,7 +643,7 @@ function applyFont(): void {
 	const size = Number(storageGet("font_size"));
 	document.body.style.fontFamily = font ?? "";
 	document.body.style.fontSize = Number.isFinite(size) && size > 0 ? `${size}px` : "";
-	updateTooltips();
+	relayout();
 }
 
 /**
