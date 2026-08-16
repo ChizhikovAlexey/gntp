@@ -55,5 +55,8 @@
  },
  "language": {
   "message": "Sprache"
+ },
+ "maxColumns": {
+  "message": "Spalten pro Zeile"
  }
 }

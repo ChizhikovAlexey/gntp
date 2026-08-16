@@ -55,5 +55,8 @@
  },
  "language": {
   "message": "语言"
+ },
+ "maxColumns": {
+  "message": "每行列数"
  }
 }

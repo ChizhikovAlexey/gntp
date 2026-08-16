@@ -55,5 +55,8 @@
  },
  "language": {
   "message": "Язык"
+ },
+ "maxColumns": {
+  "message": "Колонок в строке"
  }
 }
