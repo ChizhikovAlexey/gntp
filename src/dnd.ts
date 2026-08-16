@@ -69,6 +69,23 @@ export function normalizeRows(main: HTMLElement, cap: number): void {
 		}
 	}
 	for (const row of rows) if (row.children.length === 0) row.remove();
+	syncTracks(main, rows);
+}
+
+/**
+ * Publishes the track count the rows subgrid onto: the longest row's
+ * length. An empty trailing track would still add its gap, so the count
+ * follows the actual rows, not the row limit.
+ */
+function syncTracks(main: HTMLElement, rows: Iterable<Element>): void {
+	let cols = 1;
+	for (const row of rows) cols = Math.max(cols, row.children.length);
+	// Runs on every drag preview: skip the style invalidation when the
+	// count has not moved.
+	const value = String(cols);
+	if (main.style.getPropertyValue("--cols") !== value) {
+		main.style.setProperty("--cols", value);
+	}
 }
 
 /** Marks a column as draggable by the handle placed in its root row. */
@@ -80,11 +97,16 @@ export function makeDraggable(column: HTMLElement, id: string, rootLi: Element):
 	rootLi.insertBefore(handle, rootLi.firstChild);
 }
 
-/** The four delegated listeners; call once. */
+/**
+ * The four delegated listeners; call once. `relayout` re-measures the
+ * matrix after a drop — the preview moves columns between rows, which
+ * changes how much width each row asks for.
+ */
 export function initColumnDnd(
 	main: HTMLElement,
 	rowLimit: () => number,
 	restore: () => void,
+	relayout: () => void,
 ): void {
 	main.addEventListener("dragstart", (e) => {
 		const target = targetElement(e);
@@ -133,6 +155,7 @@ export function initColumnDnd(
 		dropped = true;
 		normalizeRows(main, rowLimit());
 		saveLayout(main);
+		relayout();
 	});
 
 	main.addEventListener("dragend", (e) => {
@@ -164,4 +187,6 @@ function previewTailRow(main: HTMLElement, y: number): void {
 	const row = createEl("div", "grid-row");
 	main.append(row);
 	moveInto(row, null);
+	// This path bypasses normalizeRows, so the tracks are synced here.
+	syncTracks(main, main.querySelectorAll(".grid-row"));
 }

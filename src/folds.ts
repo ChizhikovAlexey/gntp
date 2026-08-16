@@ -52,6 +52,7 @@ export function clearFolds(): void {
 export function initFolds(
 	main: HTMLElement,
 	expand: (li: HTMLElement, id: string) => void,
+	toggled: () => void,
 ): void {
 	main.addEventListener("click", (e) => {
 		const target = targetElement(e);
@@ -73,5 +74,8 @@ export function initFolds(
 			if (collapsed) li.querySelector(":scope > ul")?.remove();
 			else expand(li, id);
 		}
+		// Folding changes what is displayed, hence the widths; expand
+		// reports its own result once its fetch lands.
+		toggled();
 	});
 }

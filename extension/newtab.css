@@ -12,20 +12,46 @@ body {
 	background: Canvas;
 	color: CanvasText;
 }
+/* The matrix owns the column tracks so every row shares them: column N
+   has one width across all rows, like a table. --cols is the longest
+   row's length, written by sync_tracks(); the 0 minimum lets tracks
+   shrink (rows get ellipsis) instead of overflowing a narrow window. */
 #main {
+	display: grid;
+	grid-template-columns: repeat(var(--cols, 1), minmax(0, max-content));
+	justify-content: center;
+	/* Small because the next column's gutter already separates the two
+	   texts; together they add up to the air between them. */
+	column-gap: 1em;
 	/* Relative to the font size; 2 is HNTP's default item spacing. */
 	line-height: 2;
 	margin: 5vh 0 4vh;
-	padding: 0 24px;
+	padding-left: 24px;
+	/* Zero while the card is symmetric. Once fit_air() has taken air off
+	   the right side, the difference is reserved here as room the matrix
+	   cannot use: centering splits it evenly, so the matrix shifts left
+	   by half and the text — not the card — stays symmetric. */
+	padding-right: calc(24px + var(--gutter) - var(--pad));
+	/* The card's air, equal on both sides at rest. fit_air() shrinks it
+	   when the page runs short: --pad first, since nothing lives there,
+	   and only then --gutter, which holds the eye and the drag handle. */
+	--gutter: 3.5em;
+	--pad: 3.5em;
 }
-/* One matrix row: centered, columns sized by their content with air
-   between them; when the window is too narrow, columns shrink (rows
-   get ellipsis) instead of overflowing — no horizontal scrolling. */
+/* The probe pass of fit_air(): tracks take their full content width, so
+   a row measures what the layout really needs. JS adds and removes this
+   within one task, so it is never painted. */
+#main.measuring {
+	grid-template-columns: repeat(var(--cols, 1), max-content);
+}
+/* A row spans the full track set and adopts it as its own via subgrid:
+   its columns land in the shared tracks, so a short row fills them from
+   the left rather than centering on its own. */
 .grid-row {
-	display: flex;
-	justify-content: center;
-	align-items: flex-start;
-	gap: 3.5em;
+	display: grid;
+	grid-column: 1 / -1;
+	grid-template-columns: subgrid;
+	align-items: start;
 	margin-bottom: 2em;
 }
 #main a {
@@ -34,8 +60,8 @@ body {
 	color: inherit;
 	text-decoration: none;
 }
+/* A grid item stretched to its track, so columns sharing it align. */
 .column {
-	flex: 0 1 auto;
 	min-width: 0;
 }
 ul {
@@ -251,10 +277,10 @@ ul {
    row's left padding (the gutter), so no flex tricks are needed. */
 #main li {
 	position: relative;
-	/* The gutter: one indentation step, hosting the eye and the handle;
-	   the right padding balances the card backdrop around the text. */
-	padding-left: 3.5em;
-	padding-right: 1em;
+	/* The same in every mode, so nothing shifts when edit mode reveals
+	   the controls. */
+	padding-left: var(--gutter);
+	padding-right: var(--pad);
 }
 #main li > a {
 	display: block;
@@ -288,12 +314,14 @@ ul {
 	user-select: none;
 	opacity: 0;
 }
+/* Anchored to the gutter's inner edge so both stay inside it as it
+   shrinks; at the full 3.5em they resolve to 0.7em and 2.3em. */
 .hide-toggle {
-	left: 0.7em;
+	left: max(0.1em, calc(var(--gutter) - 2.8em));
 	cursor: pointer;
 }
 .drag-handle {
-	left: 2.3em;
+	left: calc(var(--gutter) - 1.2em);
 	cursor: grab;
 }
 #main.editing .hide-toggle,
