@@ -1,6 +1,8 @@
 // Access to the WebExtension APIs and localization.
 
-const ext: WebExtension = (browser ?? chrome)!;
+// typeof, not `browser ?? chrome`: reading an undeclared global throws
+// a ReferenceError, and only some browsers define `browser`.
+const ext: WebExtension = (typeof browser !== "undefined" ? browser : chrome)!;
 
 /**
  * True in Firefox. Detected by the extension page's own URL scheme:
@@ -27,12 +29,16 @@ export async function getSubTree(id: string): Promise<BookmarkTreeNode | null> {
 }
 
 /**
- * Moves a bookmark to `index` within its current folder — a real change
+ * Moves a bookmark within its folder (`index` alone), into another
+ * folder (`parentId`, appended when `index` is absent) — a real change
  * in the browser's bookmark store, visible to the bookmark manager and
  * sync.
  */
-export function moveBookmark(id: string, index: number): Promise<unknown> {
-	return ext.bookmarks.move(id, { index });
+export function moveBookmark(
+	id: string,
+	destination: { parentId?: string; index?: number },
+): Promise<unknown> {
+	return ext.bookmarks.move(id, destination);
 }
 
 const ALL_URLS = { origins: ["<all_urls>"] } as const;

@@ -10,7 +10,15 @@ import {
 	t,
 	uiLanguage,
 } from "./api.js";
-import { editMode, initColumnDnd, loadLayout, makeDraggable, normalizeRows, setEditMode } from "./dnd.js";
+import {
+	editMode,
+	initColumnDnd,
+	loadLayout,
+	makeDraggable,
+	normalizeRows,
+	setColumnHidden,
+	setEditMode,
+} from "./dnd.js";
 import { fitAir } from "./fit.js";
 import { clearFolds, deviations, initFolds, persistFolds } from "./folds.js";
 import { initHidden, loadHidden } from "./hidden.js";
@@ -72,8 +80,37 @@ const LANGUAGES: readonly (readonly [string, string])[] = [
 ];
 
 const DEFAULT_MAX_COLUMNS = 5;
+const MAX_COLUMNS = { min: 1, max: 12 } as const;
+const FONT_SIZE = { min: 8, max: 32 } as const;
+
+/**
+ * Every localStorage key the page itself writes (icon cache aside):
+ * their presence is what tells a used profile from a fresh install.
+ */
+const STATE_KEYS: readonly string[] = [
+	"columns",
+	"root",
+	"hidden",
+	"folds",
+	"remember_open",
+	"show_root",
+	"font",
+	"font_size",
+	"max_cols",
+	"lang",
+];
 
 const main = document.getElementById("main") as HTMLElement;
+
+/**
+ * The shelf holding hidden top-level columns, in edit mode only. Kept
+ * outside the matrix: as a grid item spanning every track it would add
+ * its own width to them, so hiding a wide column would still widen the
+ * visible ones.
+ */
+const shelf = createEl("div", "tree");
+shelf.id = "shelf";
+main.after(shelf);
 
 /** Everything render functions need besides the node at hand. */
 interface Render {
@@ -82,11 +119,27 @@ interface Render {
 	readonly collapsed: ReadonlySet<string>;
 }
 
+const renderCtx = (): Render => ({ hidden: loadHidden(), collapsed: deviations() });
+
+/** Folders whose children are being fetched (see expandFolder). */
+const expanding = new WeakSet<HTMLElement>();
+
+// The root-folder row, built with the settings panel and refilled on
+// every rebuild. Declared here, above the startup sequence: the first
+// rebuild runs during module evaluation and reads them, which a `let`
+// further down the file would answer with a temporal-dead-zone error.
+let rootSelect: HTMLSelectElement | null = null;
+let rootReset: HTMLElement | null = null;
+
+migrate();
 await initLocale(storageGet("lang"));
 document.title = t("newTabTitle");
 initItems(main, rebuild);
-initColumnDnd(main, maxColumns, () => void rebuild(), relayout);
-initHidden(main);
+initColumnDnd(main, shelf, maxColumns, () => void rebuild(), relayout);
+initHidden([main, shelf], (column, hidden) => {
+	setColumnHidden(main, shelf, column, hidden, maxColumns());
+	relayout();
+});
 initFolds(main, (li, id) => void expandFolder(li, id), relayout);
 hideBrokenIcons();
 addEventListener("resize", relayout);
@@ -94,38 +147,48 @@ buildSettingsUi();
 applyFont();
 await rebuild();
 if (isFirefox && !icons.strict()) addPermissionPrompt();
+maybeOnboard();
 
-/** Re-renders the whole page from the current bookmarks tree. */
+/**
+ * Re-renders the whole page from the current bookmarks tree. Nothing is
+ * touched until the awaits are done: two overlapping rebuilds then each
+ * replace the whole page, instead of one appending its rows into the
+ * other's half-built matrix.
+ */
 async function rebuild(): Promise<void> {
-	icons.revokeObjectUrls();
-	main.replaceChildren();
 	if (isFirefox) icons.setStrict(await hasHostPermission());
 	const root = await getTree();
+	icons.revokeObjectUrls();
+	main.replaceChildren();
+	shelf.replaceChildren();
 
 	const selected = selectedRoot(root);
 	fillRootSelector(root, selected.id);
 
-	const ctx: Render = { hidden: loadHidden(), collapsed: deviations() };
+	const ctx = renderCtx();
 
-	// Columns follow the saved order; ids not in it keep natural order.
+	// One column per child folder that holds bookmarks, preceded by the
+	// root's own loose bookmarks — rendered as a folder named after the
+	// root itself ("/" when it is unnamed), so it behaves like any other
+	// column: draggable, hideable, collapsible.
 	const children = selected.children ?? [];
-	const columns: (readonly [string, HTMLElement])[] = [];
-
 	const loose = children.filter((n) => n.children === undefined && n.url !== undefined);
-	if (loose.length > 0) {
-		columns.push([selected.id, looseColumn(ctx, selected, loose)]);
-	}
-	for (const node of children) {
-		if (node.children !== undefined && hasBookmarks(node)) {
-			columns.push([node.id, folderColumn(ctx, node)]);
-		}
-	}
+	const folders: BookmarkTreeNode[] =
+		loose.length > 0
+			? [{ id: selected.id, title: selected.title === "" ? "/" : selected.title, children: loose }]
+			: [];
+	folders.push(...children.filter((n) => n.children !== undefined && hasBookmarks(n)));
 
-	const byId = new Map(columns);
-	for (const [id, column] of columns) {
+	const columns = folders.map((node) => {
+		const column = folderColumn(ctx, node);
 		const rootLi = column.querySelector("li");
-		if (rootLi !== null) makeDraggable(column, id, rootLi);
-	}
+		if (rootLi !== null) makeDraggable(column, node.id, rootLi);
+		return [node.id, column] as const;
+	});
+
+	// Hidden columns never occupy matrix cells: they go to the shelf
+	// after the matrix, so only the visible ones are laid out in rows.
+	const byId = new Map(columns.filter(([id]) => !ctx.hidden.has(id)));
 
 	// Saved rows first (unknown ids dropped), then any new columns
 	// appended to the last row; the row limit is enforced afterwards.
@@ -136,7 +199,7 @@ async function rebuild(): Promise<void> {
 		for (const id of ids) placed.add(id);
 		if (ids.length > 0) rows.push(ids);
 	}
-	const missing = columns.map(([id]) => id).filter((id) => !placed.has(id));
+	const missing = [...byId.keys()].filter((id) => !placed.has(id));
 	if (missing.length > 0) {
 		if (rows.length === 0) rows.push([]);
 		rows[rows.length - 1]?.push(...missing);
@@ -150,13 +213,24 @@ async function rebuild(): Promise<void> {
 		}
 		main.append(row);
 	}
+	for (const [id, column] of columns) if (ctx.hidden.has(id)) shelf.append(column);
 	normalizeRows(main, maxColumns());
 
 	if (isFirefox) {
-		icons.flushPrefetch();
+		// Newly cached icons (first install, new bookmarks) re-render the
+		// page once so they show without a manual refresh — but never
+		// mid-drag, which would detach the row under the pointer.
+		icons.flushPrefetch(() => {
+			if (document.querySelector(".dragging") === null) void rebuild();
+		});
 		setTimeout(() => void icons.shrinkLegacyEntries(), 1000);
 	}
 	relayout();
+}
+
+/** The folder the page displays: the stored choice or the default. */
+function selectedRoot(root: BookmarkTreeNode): BookmarkTreeNode {
+	return findNode(root, storageGet("root") ?? "") ?? defaultRoot(root);
 }
 
 /**
@@ -166,11 +240,6 @@ async function rebuild(): Promise<void> {
  * with the traditional id "1" as fallback. Any failure silently falls
  * back to the tree root ("/").
  */
-/** The folder the page displays: the stored choice or the default. */
-function selectedRoot(root: BookmarkTreeNode): BookmarkTreeNode {
-	return findNode(root, storageGet("root") ?? "") ?? defaultRoot(root);
-}
-
 function defaultRoot(root: BookmarkTreeNode): BookmarkTreeNode {
 	if (isFirefox) return findNode(root, "toolbar_____") ?? root;
 	const byType = root.children?.find((n) => n.folderType === "bookmarks-bar");
@@ -193,7 +262,7 @@ function hasBookmarks(node: BookmarkTreeNode): boolean {
 	return node.children.some(hasBookmarks);
 }
 
-/** A column showing one child folder of the displayed root. */
+/** A column showing one folder of the displayed root. */
 function folderColumn(ctx: Render, node: BookmarkTreeNode): HTMLElement {
 	const column = createEl("div", "column");
 	if (ctx.hidden.has(node.id)) column.classList.add("hidden");
@@ -202,42 +271,6 @@ function folderColumn(ctx: Render, node: BookmarkTreeNode): HTMLElement {
 	renderNode(ctx, ul, node, false);
 	column.append(ul);
 	return column;
-}
-
-/**
- * A column with the displayed root's direct bookmarks, titled after the
- * root folder itself ("/" for the unnamed tree root); behaves like any
- * other column — draggable, hideable.
- */
-function looseColumn(
-	ctx: Render,
-	root: BookmarkTreeNode,
-	loose: readonly BookmarkTreeNode[],
-): HTMLElement {
-	const column = createEl("div", "column");
-	if (ctx.hidden.has(root.id)) column.classList.add("hidden");
-
-	const li = createEl("li");
-	li.setAttribute("data-id", root.id);
-	li.append(createEl("a", "folder", root.title === "" ? "/" : root.title));
-	li.append(eyeControl());
-	if (ctx.hidden.has(root.id)) li.classList.add("hidden");
-	// A column root defaults to open: collapsed only when deviated.
-	if (ctx.collapsed.has(root.id)) li.classList.add("collapsed");
-
-	const inner = createEl("ul");
-	for (const node of loose) renderNode(ctx, inner, node, true);
-	li.append(inner);
-
-	const ul = createEl("ul");
-	ul.append(li);
-	column.append(ul);
-	return column;
-}
-
-/** The eye toggling an item's hidden state; behavior lives in hidden.ts. */
-function eyeControl(): HTMLElement {
-	return createEl("span", "hide-toggle", "👁︎");
 }
 
 /** Renders a single bookmark or folder as a `<li>` appended to `ul`. */
@@ -279,7 +312,8 @@ function renderNode(
 		a.prepend(icon);
 	}
 	li.append(a);
-	li.append(eyeControl());
+	// The eye toggling the item's hidden state; behavior lives in hidden.ts.
+	li.append(createEl("span", "hide-toggle", "👁︎"));
 	if (ctx.hidden.has(node.id)) li.classList.add("hidden");
 
 	if (node.children !== undefined) {
@@ -305,16 +339,31 @@ function renderNode(
  * collapsing removed them, so the subtree is fetched fresh.
  */
 async function expandFolder(li: HTMLElement, id: string): Promise<void> {
-	if (li.querySelector(":scope > ul") !== null) return;
-	const node = await getSubTree(id);
-	// Discard if the folder vanished or was re-collapsed while fetching.
+	// The marker covers the fetch itself: collapsing and re-expanding
+	// meanwhile would otherwise start a second fetch, and both would
+	// append their own copy of the children.
+	if (li.querySelector(":scope > ul") !== null || expanding.has(li)) return;
+	expanding.add(li);
+	let node: BookmarkTreeNode | null;
+	try {
+		node = await getSubTree(id);
+	} finally {
+		expanding.delete(li);
+	}
+	// Discard if the folder vanished, was re-collapsed, or was filled by
+	// a render while fetching.
 	if (node?.children === undefined || li.classList.contains("collapsed")) return;
-	const ctx: Render = { hidden: loadHidden(), collapsed: deviations() };
+	if (li.querySelector(":scope > ul") !== null) return;
+	const ctx = renderCtx();
 	const inner = createEl("ul");
 	for (const child of node.children) renderNode(ctx, inner, child, true);
 	li.append(inner);
 	relayout();
-	if (isFirefox) icons.flushPrefetch();
+	if (isFirefox) {
+		icons.flushPrefetch(() => {
+			if (document.querySelector(".dragging") === null) void rebuild();
+		});
+	}
 }
 
 /**
@@ -328,23 +377,28 @@ async function expandFolder(li: HTMLElement, id: string): Promise<void> {
 function favicon(page: string): string | null {
 	if (!page.startsWith("http://") && !page.startsWith("https://")) return null;
 	if (!isFirefox) {
-		return `/_favicon/?pageUrl=${encodeURIComponent(page)}&size=16`;
+		return `/_favicon/?pageUrl=${encodeURIComponent(page)}&size=32`;
 	}
 	const origin = new URL(page).origin;
 	const entry = icons.cached(origin);
 	switch (entry.state) {
 		case "fresh":
 		case "stale":
-			if (entry.state === "stale") icons.prefetch(origin);
+			if (entry.state === "stale") icons.prefetch(origin, false);
 			return icons.objectUrlFor(origin, entry.data);
 		case "failed":
-			if (entry.retry) icons.prefetch(origin);
+			if (entry.retry) icons.prefetch(origin, false);
 			// Bot protection rejects extension fetches but serves plain
 			// <img> loads — use the browser-native request.
 			return `${origin}/favicon.ico`;
-		case "miss":
-			icons.prefetch(origin);
-			return icons.strict() ? null : `${origin}/favicon.ico`;
+		case "miss": {
+			// Only strict mode leaves the row blank; the fallback <img>
+			// paints something, so landing the icon is worth a re-render
+			// in the strict case alone.
+			const blank = icons.strict();
+			icons.prefetch(origin, blank);
+			return blank ? null : `${origin}/favicon.ico`;
+		}
 	}
 }
 
@@ -354,7 +408,9 @@ function favicon(page: string): string | null {
  * event doesn't bubble, hence the capture phase.
  */
 function hideBrokenIcons(): void {
-	main.addEventListener(
+	// On the document: shelf rows carry icons too, and they live outside
+	// the matrix.
+	document.addEventListener(
 		"error",
 		(e) => {
 			const target = e.target;
@@ -381,7 +437,7 @@ function relayout(): void {
  * get none.
  */
 function updateTooltips(): void {
-	for (const a of main.querySelectorAll<HTMLElement>("li > a")) {
+	for (const a of document.querySelectorAll<HTMLElement>(".tree li > a")) {
 		if (a.scrollWidth > a.clientWidth) {
 			a.title = (a.textContent ?? "").trim();
 		} else {
@@ -405,7 +461,7 @@ function buildSettingsUi(): void {
 	addSettingsToggle(head);
 	addEditToggle(head, panel);
 	// Settings the page honors even while the panel was never opened.
-	setClass(main, "no-titles", storageGet("show_root") !== "1");
+	setClass(main, "no-titles", storageGet("show_root") === "0");
 
 	// The panel's rows are built on its first opening: a casual new tab
 	// never pays their DOM, options and listeners.
@@ -413,14 +469,18 @@ function buildSettingsUi(): void {
 		"beforetoggle",
 		() => {
 			addRootSelector(panel);
-			addToggleSetting(panel, t("topLevelFolders"), "show_root", false, (on) =>
+			addToggleSetting(panel, t("topLevelFolders"), "show_root", true, (on) =>
 				setClass(main, "no-titles", !on),
 			);
 			addToggleSetting(panel, t("rememberOpenFolders"), "remember_open", true, (on) => {
 				if (on) persistFolds();
 				else clearFolds();
 			});
-			addMaxColumnsSetting(panel);
+			// "Columns per row": the matrix width.
+			addNumberSetting(panel, t("maxColumns"), "max_cols", MAX_COLUMNS, {
+				fallback: () => String(DEFAULT_MAX_COLUMNS),
+				apply: () => void rebuild(),
+			});
 			addFontSettings(panel);
 			addLanguageSetting(panel);
 			void getTree().then((root) => fillRootSelector(root, selectedRoot(root).id));
@@ -471,35 +531,78 @@ function syncReset(button: HTMLElement | null, isDefault: boolean): void {
 /**
  * A "name — control — reset" row in the settings panel. `reset` returns
  * the setting to its default (the button hides itself right after);
- * rows without one get a spacer so the panel grid stays aligned.
- * Returns the reset button, when present, so the caller can keep its
- * visibility in sync with the value.
+ * it is returned so the caller can keep its visibility in sync with the
+ * value.
  */
 function addSettingRow(
 	panel: HTMLElement,
 	name: string,
 	control: HTMLElement,
-	reset: (() => void) | null,
-): HTMLElement | null {
+	reset: () => void,
+): HTMLElement {
 	const row = createEl("label", "row");
 	row.append(createEl("span", undefined, name));
 	row.append(control);
-	let button: HTMLElement | null = null;
-	if (reset !== null) {
-		button = createEl("button", "reset off", "⟳");
-		button.setAttribute("type", "button");
-		button.title = t("resetToDefault");
-		row.append(button);
-		const btn = button;
-		button.addEventListener("click", () => {
-			reset();
-			syncReset(btn, true);
-		});
-	} else {
-		row.append(createEl("span"));
-	}
+	const button = createEl("button", "reset off", "⟳");
+	button.type = "button";
+	button.title = t("resetToDefault");
+	button.addEventListener("click", () => {
+		reset();
+		syncReset(button, true);
+	});
+	row.append(button);
 	panel.append(row);
 	return button;
+}
+
+/**
+ * A number row whose default is spelled out in the field rather than
+ * left as a placeholder, so the spinner arrows step from the value the
+ * user sees. Stored under `key`; absent = the default `fallback`
+ * reports at that moment. `apply` puts the new value to work.
+ */
+function addNumberSetting(
+	panel: HTMLElement,
+	label: string,
+	key: string,
+	{ min, max }: { min: number; max: number },
+	{ fallback, apply }: { fallback: () => string; apply: () => void },
+): void {
+	const input = createEl("input");
+	input.type = "number";
+	input.min = String(min);
+	input.max = String(max);
+
+	// Back to the default: forget the override, apply, and only then
+	// measure — a fallback that reads the page would otherwise report
+	// the very value being reset.
+	const toDefault = (): void => {
+		storageRemove(key);
+		apply();
+		input.value = fallback();
+		input.placeholder = input.value;
+	};
+
+	const stored = storedNumber(key, min, max);
+	input.value = stored === null ? fallback() : String(stored);
+	input.placeholder = input.value;
+	const resetBtn = addSettingRow(panel, label, input, toDefault);
+	syncReset(resetBtn, stored === null);
+
+	input.addEventListener("change", () => {
+		// Typing past min/max is not blocked by the input, and a cleared
+		// field means "default": both return the row to the default
+		// rather than storing a value every reader would discard.
+		const value = Number(input.value);
+		if (input.value === "" || !Number.isInteger(value) || value < min || value > max) {
+			toDefault();
+			syncReset(resetBtn, true);
+			return;
+		}
+		storageSet(key, input.value);
+		apply();
+		syncReset(resetBtn, false);
+	});
 }
 
 /**
@@ -542,8 +645,8 @@ function addToggleSetting(
  */
 function addRootSelector(panel: HTMLElement): void {
 	const select = createEl("select");
-	select.id = "root-select";
-	addSettingRow(panel, t("rootFolder"), select, () => {
+	rootSelect = select;
+	rootReset = addSettingRow(panel, t("rootFolder"), select, () => {
 		storageRemove("root");
 		void rebuild();
 	});
@@ -559,15 +662,15 @@ function addRootSelector(panel: HTMLElement): void {
 
 /** (Re)fills the selector with every folder of the tree, indented by depth. */
 function fillRootSelector(root: BookmarkTreeNode, selectedId: string): void {
-	const select = document.getElementById("root-select") as HTMLSelectElement | null;
+	const select = rootSelect;
 	if (select === null) return;
 	select.replaceChildren();
 	addFolderOption(select, root, "/", 0);
 	select.value = selectedId;
 	styleRootOptions(select, false);
-	// The row's reset control shows only for a non-default root.
-	const resetBtn = select.closest(".row")?.querySelector<HTMLElement>(".reset") ?? null;
-	syncReset(resetBtn, selectedId === defaultRoot(root).id);
+	// The reset control clears the stored choice, so it shows whenever
+	// there is one — even if it happens to name the default folder.
+	syncReset(rootReset, storageGet("root") === null);
 }
 
 function addFolderOption(
@@ -610,39 +713,31 @@ function styleRootOptions(select: HTMLSelectElement, open: boolean): void {
 
 /** How many columns fit in one matrix row before wrapping. */
 function maxColumns(): number {
-	const value = Number(storageGet("max_cols"));
-	return Number.isInteger(value) && value >= 1 && value <= 12
-		? value
-		: DEFAULT_MAX_COLUMNS;
+	return storedNumber("max_cols", MAX_COLUMNS.min, MAX_COLUMNS.max) ?? DEFAULT_MAX_COLUMNS;
 }
 
-/** "Columns per row": the matrix width, stored under "max_cols". */
-function addMaxColumnsSetting(panel: HTMLElement): void {
-	const input = createEl("input");
-	input.type = "number";
-	input.min = "1";
-	input.max = "12";
-	input.placeholder = String(DEFAULT_MAX_COLUMNS);
-	input.value = storageGet("max_cols") ?? "";
-	const resetBtn = addSettingRow(panel, t("maxColumns"), input, () => {
-		storageRemove("max_cols");
-		input.value = "";
-		void rebuild();
-	});
-	syncReset(resetBtn, maxColumns() === DEFAULT_MAX_COLUMNS);
-	input.addEventListener("change", () => {
-		storageSet("max_cols", input.value);
-		void rebuild();
-		syncReset(resetBtn, maxColumns() === DEFAULT_MAX_COLUMNS);
-	});
+/**
+ * A whole number setting, or null when it is unset or outside the range
+ * the row offers — a value typed past the input's min/max is stored as
+ * given, so every reader checks it.
+ */
+function storedNumber(key: string, min: number, max: number): number | null {
+	const stored = storageGet(key);
+	if (stored === null || stored === "") return null;
+	const value = Number(stored);
+	return Number.isInteger(value) && value >= min && value <= max ? value : null;
 }
 
-/** Applies the stored font settings as inline styles on <body>. */
+/**
+ * Applies the stored font settings as inline styles on <body>. The size
+ * is range-checked, not merely non-zero: a stored 300 would blow the
+ * page up and push the settings panel — with its reset control — off
+ * the screen, leaving no way back through the UI.
+ */
 function applyFont(): void {
-	const font = storageGet("font");
-	const size = Number(storageGet("font_size"));
-	document.body.style.fontFamily = font ?? "";
-	document.body.style.fontSize = Number.isFinite(size) && size > 0 ? `${size}px` : "";
+	document.body.style.fontFamily = storageGet("font") ?? "";
+	const size = storedNumber("font_size", FONT_SIZE.min, FONT_SIZE.max);
+	document.body.style.fontSize = size === null ? "" : `${size}px`;
 	relayout();
 }
 
@@ -699,24 +794,10 @@ function addFontSettings(panel: HTMLElement): void {
 		syncReset(fontReset, select.value === "");
 	});
 
-	const input = createEl("input");
-	input.type = "number";
-	input.min = "8";
-	input.max = "32";
-	// The effective default, measured at runtime before any override is
-	// applied — never hardcoded.
-	input.placeholder = defaultFontSize() ?? t("defaultValue");
-	input.value = storageGet("font_size") ?? "";
-	const sizeReset = addSettingRow(panel, t("fontSize"), input, () => {
-		storageRemove("font_size");
-		input.value = "";
-		applyFont();
-	});
-	syncReset(sizeReset, input.value === "");
-	input.addEventListener("change", () => {
-		storageSet("font_size", input.value);
-		applyFont();
-		syncReset(sizeReset, input.value === "");
+	// Without an override the measured size *is* the browser default.
+	addNumberSetting(panel, t("fontSize"), "font_size", FONT_SIZE, {
+		fallback: () => defaultFontSize() ?? "",
+		apply: applyFont,
 	});
 }
 
@@ -745,18 +826,150 @@ function addLanguageSetting(panel: HTMLElement): void {
 		option.value = value;
 		select.append(option);
 	}
-	const current = storageGet("lang") ?? defaultLanguage();
-	select.value = current;
+	select.value = storageGet("lang") ?? defaultLanguage();
 
 	const resetBtn = addSettingRow(panel, t("language"), select, () => {
 		storageRemove("lang");
 		location.reload();
 	});
-	syncReset(resetBtn, current === defaultLanguage());
+	syncReset(resetBtn, storageGet("lang") === null);
 	select.addEventListener("change", () => {
 		storageSet("lang", select.value);
 		location.reload();
 	});
+}
+
+/**
+ * One-time stamp of the settings schema. Runs first, before the page
+ * has written anything of its own, which makes it the only reliable
+ * moment to tell an existing profile from a fresh install — the verdict
+ * is recorded here so nothing has to guess it again later.
+ *
+ * A default that changes must not move the page under existing users:
+ * a profile that predates the stamp keeps the old default, written out
+ * explicitly, and is never offered the first-run tour. A fresh install
+ * stores nothing and simply gets the current defaults.
+ */
+function migrate(): void {
+	if (storageGet("schema") !== null) return;
+	if (usedProfile()) {
+		// "Top level folders" defaulted to off before 1.2.0.
+		if (storageGet("show_root") === null) storageSet("show_root", "0");
+		storageSet("onboarded", "1");
+	}
+	storageSet("schema", "1");
+}
+
+/**
+ * True when the profile already holds choices from an earlier visit.
+ * The icon cache counts too: on Firefox it is written on the very first
+ * page load, so it marks a used profile even when nothing was ever
+ * configured.
+ */
+function usedProfile(): boolean {
+	return STATE_KEYS.some((key) => storageGet(key) !== null) || icons.cachedAny();
+}
+
+/**
+ * First-run onboarding: an interactive tour in a card under the ✎︎/⚙︎
+ * corner. Each step softly highlights one control and waits for that
+ * real action on it — enter edit mode, open the settings, close them,
+ * leave edit mode — the last of which ends the tour; the skip button
+ * ends it at any point. Shown once, to new users only: a profile that
+ * already stores any GNTP state counts as onboarded silently.
+ */
+function maybeOnboard(): void {
+	// migrate() has already excused existing profiles; an unfinished
+	// tour is offered again on the next new tab.
+	if (storageGet("onboarded") !== null) return;
+
+	const card = createEl("div");
+	card.id = "onboarding";
+	// A step's message is a list: one instruction per "\n"-joined line.
+	const text = createEl("ul", "hint");
+	const setText = (key: string): void => {
+		text.replaceChildren();
+		for (const line of t(key).split("\n")) text.append(createEl("li", undefined, line));
+	};
+	card.append(text);
+	const button = createEl("button", undefined, t("skip"));
+	card.append(button);
+	document.body.append(card);
+
+	const editBtn = document.getElementById("edit-toggle");
+	const gear = document.getElementById("settings-toggle");
+	const panel = document.getElementById("settings-panel");
+
+	let target: Element | null = null;
+	const highlight = (el: Element | null): void => {
+		target?.classList.remove("onboard-target");
+		target = el;
+		el?.classList.add("onboard-target");
+	};
+
+	// The open settings panel is a popover — painted above everything and
+	// sitting in the card's own corner — so while it is open the card
+	// stands just left of it, close to what that step describes. The
+	// panel is filled asynchronously and its width follows the language,
+	// so the placement is kept up to date by an observer rather than
+	// taken once as it opens.
+	const GAP = 8;
+	const placeCard = (): void => {
+		const open = panel !== null && panel.matches(":popover-open");
+		const left = open ? panel.getBoundingClientRect().left : 0;
+		if (!open || left <= 0) {
+			card.style.removeProperty("right");
+			card.style.removeProperty("max-width");
+			return;
+		}
+		card.style.right = `${window.innerWidth - left + GAP}px`;
+		// Never wider than the room left of the panel.
+		card.style.maxWidth = `${Math.max(200, left - 2 * GAP)}px`;
+	};
+	const watchPanel = new ResizeObserver(placeCard);
+	if (panel !== null) watchPanel.observe(panel);
+	watchPanel.observe(document.documentElement);
+
+	let step = 1;
+	const show = (at: number, key: string, el: Element | null): void => {
+		step = at;
+		setText(key);
+		highlight(el);
+		placeCard();
+	};
+
+	const finish = (): void => {
+		highlight(null);
+		watchPanel.disconnect();
+		card.remove();
+		editBtn?.removeEventListener("click", onEdit);
+		panel?.removeEventListener("toggle", onPanel);
+		storageSet("onboarded", "1");
+	};
+
+	function onEdit(): void {
+		if (editMode()) {
+			if (step === 1) show(2, "onboardSettings", gear);
+		} else if (step === 4) {
+			finish();
+		} else {
+			// Edit mode left before the tour got there: back to step 1.
+			show(1, "onboardEdit", editBtn);
+		}
+	}
+
+	function onPanel(e: Event): void {
+		const open = (e as ToggleEvent).newState === "open";
+		if (open && step === 2) show(3, "onboardRoot", gear);
+		else if (!open && step === 3) show(4, "onboardExit", editBtn);
+		// Reopened at another step: the card still has to clear the panel.
+		else placeCard();
+	}
+
+	show(1, "onboardEdit", editBtn);
+	editBtn?.addEventListener("click", onEdit);
+	panel?.addEventListener("toggle", onPanel);
+	button.addEventListener("click", finish);
 }
 
 /**

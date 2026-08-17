@@ -41,9 +41,6 @@
  "fontMonospace": {
   "message": "Monospace"
  },
- "defaultValue": {
-  "message": "default"
- },
  "permissionRequest": {
   "message": "To cache bookmark icons, GNTP needs access to the bookmarked sites."
  },
@@ -58,5 +55,20 @@
  },
  "maxColumns": {
   "message": "Columns per row"
+ },
+ "onboardEdit": {
+  "message": "Click ✎︎ to turn on edit mode."
+ },
+ "onboardSettings": {
+  "message": "Drag the ⠿ handle to move a bookmark or folder.\nClick 👁︎ to hide a bookmark or folder.\nClick ⚙︎ to open the settings."
+ },
+ "onboardRoot": {
+  "message": "Root folder — which bookmark folder this page shows.\nColumns, font and language are here too.\nClick ⚙︎ again to close the settings."
+ },
+ "skip": {
+  "message": "Skip"
+ },
+ "onboardExit": {
+  "message": "Click ✎︎ to leave edit mode."
  }
 }

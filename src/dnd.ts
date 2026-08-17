@@ -2,11 +2,19 @@
 // in localStorage under "columns" as rows of comma-separated ids joined
 // with "|" (a legacy comma-only value reads as a single row).
 //
+// Hidden columns live on the shelf, a container of its own after the
+// matrix (shown in edit mode only), so they stay out of the saved
+// layout, the row cascade and the grid's track sizing entirely. Shelf
+// columns are not draggable and accept no drops: the eye puts them
+// back.
+//
 // The matrix is reordered live while dragging: hovering a column
 // inserts next to it; dragging past the bottom edge of the last row
 // previews a new tail row. Drop commits (cascading overflow past the
-// row limit), a cancelled drag restores the saved layout. Listeners are delegated to
-// #main — four in total, independent of the column count.
+// row limit), a cancelled drag restores the saved layout. The four
+// listeners are delegated — dragstart and dragend on #main, dragover
+// and drop on the document, whose box also covers the tail-row preview
+// below the matrix — so their number is independent of the columns.
 
 import { createEl, setClass, storageGet, storageSet, targetElement } from "./util.js";
 
@@ -36,7 +44,7 @@ export function loadLayout(): string[][] {
 
 function saveLayout(main: HTMLElement): void {
 	const rows: string[] = [];
-	for (const row of main.querySelectorAll(".grid-row")) {
+	for (const row of matrixRows(main)) {
 		const ids: string[] = [];
 		for (const column of row.children) {
 			const id = column.getAttribute("data-id");
@@ -47,20 +55,29 @@ function saveLayout(main: HTMLElement): void {
 	storageSet("columns", rows.join("|"));
 }
 
+function matrixRows(main: HTMLElement): HTMLElement[] {
+	return [...main.querySelectorAll<HTMLElement>(".grid-row")];
+}
+
+function appendRow(main: HTMLElement): HTMLElement {
+	const row = createEl("div", "grid-row");
+	main.append(row);
+	return row;
+}
+
 /**
  * Enforces the row limit by cascading overflowing columns into the next
  * row, and drops empty rows.
  */
 export function normalizeRows(main: HTMLElement, cap: number): void {
-	const rows = [...main.querySelectorAll<HTMLElement>(".grid-row")];
+	const rows = matrixRows(main);
 	for (let i = 0; i < rows.length; i++) {
 		const row = rows[i];
 		if (row === undefined) continue;
 		while (row.children.length > cap) {
 			let next = rows[i + 1];
 			if (next === undefined) {
-				next = createEl("div", "grid-row");
-				main.append(next);
+				next = appendRow(main);
 				rows.push(next);
 			}
 			const overflow = row.lastElementChild;
@@ -88,6 +105,29 @@ function syncTracks(main: HTMLElement, rows: Iterable<Element>): void {
 	}
 }
 
+/**
+ * Moves a top-level column between the matrix and the hidden shelf, so
+ * hidden columns never occupy matrix cells. Hiding frees the column's
+ * cell (its emptied row closes up); unhiding appends the column to the
+ * last row. The saved layout follows.
+ */
+export function setColumnHidden(
+	main: HTMLElement,
+	shelf: HTMLElement,
+	column: HTMLElement,
+	hidden: boolean,
+	cap: number,
+): void {
+	if (hidden) {
+		shelf.append(column);
+	} else {
+		const rows = matrixRows(main);
+		(rows[rows.length - 1] ?? appendRow(main)).append(column);
+	}
+	normalizeRows(main, cap);
+	saveLayout(main);
+}
+
 /** Marks a column as draggable by the handle placed in its root row. */
 export function makeDraggable(column: HTMLElement, id: string, rootLi: Element): void {
 	column.setAttribute("data-id", id);
@@ -104,6 +144,7 @@ export function makeDraggable(column: HTMLElement, id: string, rootLi: Element):
  */
 export function initColumnDnd(
 	main: HTMLElement,
+	shelf: HTMLElement,
 	rowLimit: () => number,
 	restore: () => void,
 	relayout: () => void,
@@ -131,10 +172,12 @@ export function initColumnDnd(
 	// On document, not #main: the tail-row preview lives below #main's
 	// box, and the drop must be allowed there too.
 	document.addEventListener("dragover", (e) => {
-		if (dragged === null) return;
+		if (activeDrag() === null) return;
 		e.preventDefault();
 		const over = targetElement(e)?.closest<HTMLElement>(".column");
-		if (over !== null && over !== undefined) {
+		// A shelf column is no insertion anchor: hovering the shelf acts
+		// like empty space below the matrix.
+		if (over !== null && over !== undefined && !shelf.contains(over)) {
 			if (over === dragged) return;
 			// Left half inserts before the hovered column, right half after.
 			const rect = over.getBoundingClientRect();
@@ -150,7 +193,7 @@ export function initColumnDnd(
 	});
 
 	document.addEventListener("drop", (e) => {
-		if (dragged === null) return;
+		if (activeDrag() === null) return;
 		e.preventDefault();
 		dropped = true;
 		normalizeRows(main, rowLimit());
@@ -169,6 +212,20 @@ export function initColumnDnd(
 	});
 }
 
+/**
+ * The column being dragged, or null. A re-render during a drag detaches
+ * it, and its dragend then fires on the detached node — never reaching
+ * the delegated listeners — so the stale state is dropped here instead
+ * of being carried into the next drag.
+ */
+function activeDrag(): HTMLElement | null {
+	if (dragged !== null && !dragged.isConnected) {
+		dragged = null;
+		dropped = false;
+	}
+	return dragged;
+}
+
 /** Moves the dragged column, pruning its old row if that empties it. */
 function moveInto(row: Element | null, before: Element | null): void {
 	if (dragged === null || row === null) return;
@@ -179,14 +236,12 @@ function moveInto(row: Element | null, before: Element | null): void {
 
 function previewTailRow(main: HTMLElement, y: number): void {
 	if (dragged === null) return;
-	const last = main.querySelector<HTMLElement>(".grid-row:last-of-type");
-	if (last === null || y <= last.getBoundingClientRect().bottom) return;
+	const rows = matrixRows(main);
+	const last = rows[rows.length - 1];
+	if (last === undefined || y <= last.getBoundingClientRect().bottom) return;
 	// Already the sole occupant of the last row: nothing to do.
-	const current = dragged.parentElement;
-	if (current === last && last.children.length === 1) return;
-	const row = createEl("div", "grid-row");
-	main.append(row);
-	moveInto(row, null);
+	if (dragged.parentElement === last && last.children.length === 1) return;
+	moveInto(appendRow(main), null);
 	// This path bypasses normalizeRows, so the tracks are synced here.
-	syncTracks(main, main.querySelectorAll(".grid-row"));
+	syncTracks(main, matrixRows(main));
 }

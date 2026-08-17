@@ -41,9 +41,6 @@
  "fontMonospace": {
   "message": "À chasse fixe"
  },
- "defaultValue": {
-  "message": "par défaut"
- },
  "permissionRequest": {
   "message": "Pour mettre en cache les icônes des marque-pages, GNTP doit accéder aux sites enregistrés."
  },
@@ -58,5 +55,20 @@
  },
  "maxColumns": {
   "message": "Colonnes par ligne"
+ },
+ "onboardEdit": {
+  "message": "Cliquez sur ✎︎ pour activer le mode édition."
+ },
+ "onboardSettings": {
+  "message": "Faites glisser la poignée ⠿ pour déplacer un marque-page ou un dossier.\nCliquez sur 👁︎ pour masquer un marque-page ou un dossier.\nCliquez sur ⚙︎ pour ouvrir les réglages."
+ },
+ "onboardRoot": {
+  "message": "Dossier racine : le dossier de marque-pages affiché sur cette page.\nIci aussi : colonnes, police et langue.\nCliquez de nouveau sur ⚙︎ pour fermer les réglages."
+ },
+ "skip": {
+  "message": "Passer"
+ },
+ "onboardExit": {
+  "message": "Cliquez sur ✎︎ pour quitter le mode édition."
  }
 }

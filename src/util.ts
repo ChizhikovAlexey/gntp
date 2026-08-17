@@ -39,6 +39,13 @@ export function targetElement(e: Event): Element | null {
 	return e.target instanceof Element ? e.target : null;
 }
 
+/** The bookmark row the event happened in, with its bookmark id. */
+export function eventItem(e: Event): { li: HTMLElement; id: string } | null {
+	const li = targetElement(e)?.closest<HTMLElement>("li[data-id]") ?? null;
+	const id = li?.getAttribute("data-id") ?? null;
+	return li === null || id === null ? null : { li, id };
+}
+
 /** Adds or removes a class depending on `on`. */
 export function setClass(el: Element, name: string, on: boolean): void {
 	el.classList.toggle(name, on);

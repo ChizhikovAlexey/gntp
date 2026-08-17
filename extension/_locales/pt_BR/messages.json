@@ -41,9 +41,6 @@
  "fontMonospace": {
   "message": "Monoespaçada"
  },
- "defaultValue": {
-  "message": "padrão"
- },
  "permissionRequest": {
   "message": "Para armazenar em cache os ícones dos favoritos, o GNTP precisa de acesso aos sites salvos."
  },
@@ -58,5 +55,20 @@
  },
  "maxColumns": {
   "message": "Colunas por linha"
+ },
+ "onboardEdit": {
+  "message": "Clique em ✎︎ para ativar o modo de edição."
+ },
+ "onboardSettings": {
+  "message": "Arraste a alça ⠿ para mover um favorito ou uma pasta.\nClique em 👁︎ para ocultar um favorito ou uma pasta.\nClique em ⚙︎ para abrir as configurações."
+ },
+ "onboardRoot": {
+  "message": "Pasta raiz — qual pasta de favoritos esta página mostra.\nAqui também: colunas, fonte e idioma.\nClique em ⚙︎ novamente para fechar as configurações."
+ },
+ "skip": {
+  "message": "Pular"
+ },
+ "onboardExit": {
+  "message": "Clique em ✎︎ para sair do modo de edição."
  }
 }

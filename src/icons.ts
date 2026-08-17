@@ -5,9 +5,9 @@
 // revalidate over the network on every page open. Instead, icons are
 // cached in localStorage as data: URLs and read *synchronously* during
 // render — a cache hit paints in the same frame as the bookmark text.
-// Fetched icons are re-encoded to 16×16 PNG, shrinking multi-size ICOs
-// from tens of kilobytes to well under one: less storage, smaller DOM
-// strings, smaller decoded bitmaps.
+// Fetched icons are re-encoded to 32×32 PNG (crisp in the 16px CSS slot
+// on HiDPI screens), shrinking multi-size ICOs from tens of kilobytes
+// to a few: less storage, smaller DOM strings, smaller decoded bitmaps.
 
 import { storageGet, storageRemove, storageSet } from "./util.js";
 
@@ -21,7 +21,7 @@ const TTL_MS = 3 * 24 * 60 * 60 * 1000;
 const FAIL_TTL_MS = 24 * 60 * 60 * 1000;
 
 const MAX_ICON_BYTES = 128 * 1024;
-const ENCODED_SIZE = 16;
+const ENCODED_SIZE = 32;
 /**
  * Hard cap on a stored entry: anything bigger decodes into a large
  * bitmap attributed to every new tab page. Icons that can't be
@@ -43,10 +43,17 @@ export function strict(): boolean {
 	return strictMode;
 }
 
-// Origins whose icons are missing from the cache, collected during
-// render; fetched only after the first paint so background loading
-// never competes with rendering the cached icons.
-const pending = new Set<string>();
+// Origins whose icons the render could not paint from the cache,
+// fetched only after the first paint so background loading never
+// competes with rendering the cached icons. The flag records whether
+// the row was left blank, i.e. whether landing the icon is worth a
+// re-render.
+const pending = new Map<string, boolean>();
+// Origins being fetched right now: a folder expanded mid-batch must not
+// queue them a second time.
+const inFlight = new Set<string>();
+
+let shrinking = false;
 
 const cacheKey = (origin: string): string => `icon:${origin}`;
 
@@ -100,38 +107,80 @@ export function cached(origin: string): Cached {
 	return { state: age < TTL_MS ? "fresh" : "stale", data };
 }
 
-/** Queues the origin's favicon to be fetched and cached after first paint. */
-export function prefetch(origin: string): void {
-	pending.add(origin);
+/**
+ * True if the cache holds anything at all — evidence that this profile
+ * has opened the page before, even with no setting ever changed.
+ */
+export function cachedAny(): boolean {
+	for (let i = 0; i < localStorage.length; i++) {
+		if (localStorage.key(i)?.startsWith("icon:") === true) return true;
+	}
+	return false;
+}
+
+/**
+ * Queues the origin's favicon to be fetched and cached after first
+ * paint. `blank` says the row shows no icon at all meanwhile, so a
+ * successful fetch is worth re-rendering for.
+ */
+export function prefetch(origin: string, blank: boolean): void {
+	if (!inFlight.has(origin)) pending.set(origin, blank);
 }
 
 /**
  * Starts the queued fetches strictly after the page has painted:
  * requestAnimationFrame fires just before the next paint, a zero
  * timeout scheduled from it runs right after.
+ *
+ * `gained` runs once, after the whole batch settles, if the cache now
+ * holds an icon for a row the render left blank (first install, new
+ * bookmarks) — the caller re-renders so those icons show without a
+ * manual refresh. Background TTL refreshes never trigger it.
  */
-export function flushPrefetch(): void {
+export function flushPrefetch(gained?: () => void): void {
 	requestAnimationFrame(() => {
 		setTimeout(() => {
-			for (const origin of pending) void fetchAndStore(origin);
+			const batch = [...pending].map(([origin, blank]) => fetchAndStore(origin, blank));
 			pending.clear();
+			void Promise.all(batch).then((fresh) => {
+				if (fresh.some(Boolean)) gained?.();
+			});
 		});
 	});
 }
 
-async function fetchAndStore(origin: string): Promise<void> {
+/**
+ * Fetches and caches one origin's icon. True only when the row it was
+ * queued for showed nothing and the cache now holds an icon — the one
+ * case a re-render improves. The cache is read back instead of trusting
+ * the write: a full quota stores nothing (storageSet swallows the
+ * error), and claiming otherwise would ask for a re-render that only
+ * queues the very same fetch again, forever.
+ */
+async function fetchAndStore(origin: string, blank: boolean): Promise<boolean> {
 	const key = cacheKey(origin);
-	const dataUrl = await fetchIcon(origin);
-	if (dataUrl !== null) {
-		storageSet(key, `${Date.now()}|${dataUrl}`);
-		return;
+	inFlight.add(origin);
+	try {
+		const dataUrl = await fetchIcon(origin);
+		if (dataUrl !== null) {
+			storageSet(key, `${Date.now()}|${dataUrl}`);
+		} else if (!hasIcon(key)) {
+			// Record the failure (switches the origin to the direct-<img>
+			// fallback and throttles retries), but never overwrite a
+			// previously cached icon with it.
+			storageSet(key, `${Date.now()}|`);
+		}
+		return blank && hasIcon(key);
+	} finally {
+		inFlight.delete(origin);
 	}
-	// Record the failure (switches the origin to the direct-<img>
-	// fallback and throttles retries), but never overwrite a previously
-	// cached icon with it.
-	const existing = storageGet(key);
-	const hasIcon = existing !== null && !existing.endsWith("|");
-	if (!hasIcon) storageSet(key, `${Date.now()}|`);
+}
+
+/** True when the stored entry holds an icon rather than a failure. */
+function hasIcon(key: string): boolean {
+	const entry = storageGet(key);
+	// Base64 never ends in "|", so an entry that does records a failure.
+	return entry !== null && !entry.endsWith("|");
 }
 
 /**
@@ -212,6 +261,9 @@ async function reencode(src: string): Promise<string | null> {
  * Runs sequentially in idle time; keeps each entry's timestamp.
  */
 export async function shrinkLegacyEntries(): Promise<void> {
+	// Armed by every render; the scan itself is worth running only once.
+	if (shrinking) return;
+	shrinking = true;
 	const RECODE_THRESHOLD = 2048;
 	const keys: string[] = [];
 	for (let i = 0; i < localStorage.length; i++) {
@@ -225,6 +277,9 @@ export async function shrinkLegacyEntries(): Promise<void> {
 		const data = entry.slice(separator + 1);
 		if (data.length <= RECODE_THRESHOLD || !data.startsWith("data:")) continue;
 		const small = await reencode(data);
+		// A fetch may have replaced the entry while it was re-encoding;
+		// the fresh icon must not lose to this stale copy.
+		if (storageGet(key) !== entry) continue;
 		if (small !== null && small.length <= MAX_STORED_CHARS) {
 			storageSet(key, entry.slice(0, separator + 1) + small);
 		} else {

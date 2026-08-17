@@ -41,9 +41,6 @@
  "fontMonospace": {
   "message": "等宽"
  },
- "defaultValue": {
-  "message": "默认"
- },
  "permissionRequest": {
   "message": "要缓存书签图标，GNTP 需要访问已收藏的网站。"
  },
@@ -58,5 +55,20 @@
  },
  "maxColumns": {
   "message": "每行列数"
+ },
+ "onboardEdit": {
+  "message": "点击 ✎︎ 开启编辑模式。"
+ },
+ "onboardSettings": {
+  "message": "拖动 ⠿ 手柄可移动书签或文件夹。\n点击 👁︎ 可隐藏书签或文件夹。\n点击 ⚙︎ 打开设置。"
+ },
+ "onboardRoot": {
+  "message": "根文件夹——此页面显示哪个书签文件夹。\n此外还有每行列数、字体和语言。\n再次点击 ⚙︎ 关闭设置。"
+ },
+ "skip": {
+  "message": "跳过"
+ },
+ "onboardExit": {
+  "message": "点击 ✎︎ 退出编辑模式。"
  }
 }

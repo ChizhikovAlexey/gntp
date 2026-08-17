@@ -41,9 +41,6 @@
  "fontMonospace": {
   "message": "Monoespaciada"
  },
- "defaultValue": {
-  "message": "predeterminado"
- },
  "permissionRequest": {
   "message": "Para almacenar en caché los iconos de los marcadores, GNTP necesita acceso a los sitios guardados."
  },
@@ -58,5 +55,20 @@
  },
  "maxColumns": {
   "message": "Columnas por fila"
+ },
+ "onboardEdit": {
+  "message": "Pulsa ✎︎ para activar el modo de edición."
+ },
+ "onboardSettings": {
+  "message": "Arrastra el asa ⠿ para mover un marcador o una carpeta.\nPulsa 👁︎ para ocultar un marcador o una carpeta.\nPulsa ⚙︎ para abrir los ajustes."
+ },
+ "onboardRoot": {
+  "message": "Carpeta raíz: qué carpeta de marcadores se muestra en esta página.\nAquí también: columnas, fuente e idioma.\nPulsa ⚙︎ de nuevo para cerrar los ajustes."
+ },
+ "skip": {
+  "message": "Omitir"
+ },
+ "onboardExit": {
+  "message": "Pulsa ✎︎ para salir del modo de edición."
  }
 }

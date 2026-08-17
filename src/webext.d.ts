@@ -22,7 +22,7 @@ interface WebExtension {
 	readonly bookmarks: {
 		getTree(): Promise<readonly BookmarkTreeNode[]>;
 		getSubTree(id: string): Promise<readonly BookmarkTreeNode[]>;
-		move(id: string, destination: { index: number }): Promise<unknown>;
+		move(id: string, destination: { parentId?: string; index?: number }): Promise<unknown>;
 	};
 	readonly i18n: {
 		getMessage(key: string): string;

@@ -6,7 +6,7 @@
 body {
 	/* The browser's own menu/UI font — the "Browser default" choice.
 	   The Font settings override family/size via inline styles
-	   (see apply_font), which beat this shorthand in the cascade. */
+	   (see applyFont), which beat this shorthand in the cascade. */
 	font: menu;
 	/* Colors resolved by the browser for its current scheme. */
 	background: Canvas;
@@ -14,7 +14,7 @@ body {
 }
 /* The matrix owns the column tracks so every row shares them: column N
    has one width across all rows, like a table. --cols is the longest
-   row's length, written by sync_tracks(); the 0 minimum lets tracks
+   row's length, written by syncTracks(); the 0 minimum lets tracks
    shrink (rows get ellipsis) instead of overflowing a narrow window. */
 #main {
 	display: grid;
@@ -27,18 +27,18 @@ body {
 	line-height: 2;
 	margin: 5vh 0 4vh;
 	padding-left: 24px;
-	/* Zero while the card is symmetric. Once fit_air() has taken air off
+	/* Zero while the card is symmetric. Once fitAir() has taken air off
 	   the right side, the difference is reserved here as room the matrix
 	   cannot use: centering splits it evenly, so the matrix shifts left
 	   by half and the text — not the card — stays symmetric. */
 	padding-right: calc(24px + var(--gutter) - var(--pad));
-	/* The card's air, equal on both sides at rest. fit_air() shrinks it
+	/* The card's air, equal on both sides at rest. fitAir() shrinks it
 	   when the page runs short: --pad first, since nothing lives there,
 	   and only then --gutter, which holds the eye and the drag handle. */
 	--gutter: 3.5em;
 	--pad: 3.5em;
 }
-/* The probe pass of fit_air(): tracks take their full content width, so
+/* The probe pass of fitAir(): tracks take their full content width, so
    a row measures what the layout really needs. JS adds and removes this
    within one task, so it is never painted. */
 #main.measuring {
@@ -54,7 +54,7 @@ body {
 	align-items: start;
 	margin-bottom: 2em;
 }
-#main a {
+.tree a {
 	/* Links look like ordinary text: the browser's CanvasText color
 	   inherited from body — no link-blue, no visited-purple, no underlines. */
 	color: inherit;
@@ -71,7 +71,7 @@ ul {
    the eye and drag handle), not from the lists: this keeps the controls
    inside the row's box, so hover, the card and the drag snapshot all
    agree on its geometry. */
-#main ul {
+.tree ul {
 	padding-inline-start: 0;
 }
 /* Favicon slot: fixed 16px box so rows align with or without an icon. */
@@ -92,17 +92,23 @@ ul {
 	right: 8px;
 	text-align: right;
 }
-/* The settings popover: the browser manages opening, light dismiss and
-   Esc (popovertarget on the gear); only look and placement are ours. */
-#settings-panel {
+/* The floating surfaces — settings panel, permission banner, onboarding
+   card — share one chrome; only placement and inner layout differ. */
+#settings-panel,
+#permission-banner,
+#onboarding {
 	position: fixed;
-	inset: 3.2em 8px auto auto;
-	margin: 0;
 	background: Canvas;
 	border: 1px solid color-mix(in srgb, CanvasText 25%, transparent);
 	border-radius: 8px;
-	padding: 10px;
 	box-shadow: 0 2px 8px color-mix(in srgb, CanvasText 15%, transparent);
+}
+/* The settings popover: the browser manages opening, light dismiss and
+   Esc (popovertarget on the gear); only look and placement are ours. */
+#settings-panel {
+	inset: 3.2em 8px auto auto;
+	margin: 0;
+	padding: 10px;
 	/* Shared columns — name, control, reset — sized independently:
 	   they can never intersect. */
 	grid-template-columns: max-content auto max-content;
@@ -112,21 +118,30 @@ ul {
 #settings-panel:popover-open {
 	display: grid;
 }
+/* Every glyph button on the page — the two corner toggles, the per-row
+   reset, the banner's dismiss: bare text that lights up on hover. */
 #edit-toggle,
-#settings-toggle {
+#settings-toggle,
+#settings .reset,
+#permission-banner .dismiss {
 	border: none;
 	background: none;
 	font: inherit;
-	font-size: 1.25em;
 	color: inherit;
 	cursor: pointer;
 	opacity: 0.4;
-	padding: 2px 8px;
-	border-radius: 6px;
 }
 #edit-toggle:hover,
-#settings-toggle:hover {
+#settings-toggle:hover,
+#settings .reset:hover,
+#permission-banner .dismiss:hover {
 	opacity: 1;
+}
+#edit-toggle,
+#settings-toggle {
+	font-size: 1.25em;
+	padding: 2px 8px;
+	border-radius: 6px;
 }
 #main.editing ~ #settings #edit-toggle {
 	opacity: 1;
@@ -198,43 +213,67 @@ ul {
 
 /* First-run banner asking for the icon-cache host permission. */
 #permission-banner {
-	position: fixed;
 	top: 8px;
 	left: 50%;
 	transform: translateX(-50%);
 	display: flex;
 	align-items: center;
 	gap: 12px;
-	background: Canvas;
-	border: 1px solid color-mix(in srgb, CanvasText 25%, transparent);
-	border-radius: 8px;
 	padding: 8px 12px;
-	box-shadow: 0 2px 8px color-mix(in srgb, CanvasText 15%, transparent);
 }
-#permission-banner .dismiss {
-	border: none;
-	background: none;
-	font: inherit;
-	color: inherit;
-	cursor: pointer;
-	opacity: 0.4;
+/* First-run onboarding card, under the ✎︎/⚙︎ corner it points at. */
+#onboarding {
+	top: 3.2em;
+	right: 8px;
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	max-width: 24em;
+	padding: 12px;
+	text-align: left;
 }
-#permission-banner .dismiss:hover {
+/* The step's instructions, one list line each (no markers — every line
+   opens with the glyph of the control it talks about). */
+#onboarding .hint {
+	opacity: 0.7;
+	white-space: normal;
+	line-height: 1.4;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+#onboarding button {
+	align-self: flex-end;
+}
+/* Soft highlight of the element the current step asks to click. The
+   theme's own AccentColor (as with the settings switches) keeps it
+   visible on any light or dark browser theme without hardcoded colors. */
+.onboard-target {
+	outline: 2px solid AccentColor;
+	outline-offset: 2px;
+	animation: onboard-pulse 1.6s ease-in-out infinite;
+}
+/* The corner buttons rest at 0.4 opacity; a highlighted one must not. */
+#edit-toggle.onboard-target,
+#settings-toggle.onboard-target {
 	opacity: 1;
+}
+@keyframes onboard-pulse {
+	50% {
+		outline-color: color-mix(in srgb, AccentColor 25%, transparent);
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	.onboard-target {
+		animation: none;
+	}
 }
 
 /* Per-row reset-to-default control. */
 #settings .reset {
-	border: none;
-	background: none;
-	font: inherit;
-	color: inherit;
-	cursor: pointer;
-	opacity: 0.4;
 	padding: 0 2px;
-}
-#settings .reset:hover {
-	opacity: 1;
 }
 /* Hidden while the value matches the default; keeps its grid cell. */
 #settings .reset.off {
@@ -249,10 +288,10 @@ ul {
 /* Collapsible folders: the header carries a disclosure marker sized
    like a favicon (so folder titles align with bookmark titles), and a
    collapsed folder hides its list. */
-#main .folder {
+.tree .folder {
 	cursor: pointer;
 }
-#main .folder::before {
+.tree .folder::before {
 	content: "▾";
 	display: inline-block;
 	width: 16px;
@@ -260,10 +299,10 @@ ul {
 	text-align: center;
 	opacity: 0.6;
 }
-#main li.collapsed > .folder::before {
+.tree li.collapsed > .folder::before {
 	content: "▸";
 }
-#main li.collapsed > ul {
+.tree li.collapsed > ul {
 	display: none;
 }
 /* A column root whose title is hidden has no way to be toggled — its
@@ -275,16 +314,16 @@ ul {
 /* A row: the link is a full-width block, the nested folder list flows
    below it; the eye and handle live absolutely positioned in the
    row's left padding (the gutter), so no flex tricks are needed. */
-#main li {
+.tree li {
 	position: relative;
 	/* The same in every mode, so nothing shifts when edit mode reveals
 	   the controls. */
 	padding-left: var(--gutter);
 	padding-right: var(--pad);
 }
-#main li > a {
+.tree li > a {
 	display: block;
-	/* One line per row; truncated titles get a tooltip (update_tooltips). */
+	/* One line per row; truncated titles get a tooltip (updateTooltips). */
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -299,9 +338,17 @@ ul {
    root) is a card; hovering the innermost li shows the backdrop and its
    two gutter controls, vertically centered left of the card. */
 .dragging,
+#shelf li:hover:not(:has(li:hover)),
 #main.editing:not(:has(.dragging)) li:hover:not(:has(li:hover)) {
 	background: color-mix(in srgb, Canvas 60%, transparent);
 	outline: 1px solid color-mix(in srgb, CanvasText 25%, transparent);
+	border-radius: 6px;
+}
+
+/* The folder a dragged bookmark would drop into (middle of its header);
+   accent-tinted to read as "inside", unlike the insertion preview. */
+#main li.drop-into > .folder {
+	background: color-mix(in srgb, AccentColor 25%, transparent);
 	border-radius: 6px;
 }
 
@@ -328,8 +375,7 @@ ul {
 #main.editing .drag-handle {
 	display: inline;
 }
-#main.editing:not(:has(.dragging)) li:hover:not(:has(li:hover)) > .hide-toggle,
-#main.editing:not(:has(.dragging)) li:hover:not(:has(li:hover)) > .drag-handle {
+#main.editing:not(:has(.dragging)) li:hover:not(:has(li:hover)) > :is(.hide-toggle, .drag-handle) {
 	opacity: 1;
 }
 /* Hidden folders exist in the DOM but show only in edit mode. */
@@ -338,4 +384,44 @@ ul {
 }
 #main.editing .hidden {
 	opacity: 0.5;
+}
+/* The shelf of hidden top-level columns, below the matrix and outside
+   it: a grid item spanning every track would add its own width to them,
+   so hiding a wide column would still widen the visible ones. */
+#shelf {
+	display: none;
+	flex-wrap: wrap;
+	align-items: start;
+	justify-content: center;
+	column-gap: 1em;
+	line-height: 2;
+	margin: 0 24px 4vh;
+	padding-top: 1em;
+	border-top: 1px dashed color-mix(in srgb, CanvasText 25%, transparent);
+	/* Its rows carry the same controls as the matrix ones. */
+	--gutter: 3.5em;
+	--pad: 3.5em;
+}
+#main.editing ~ #shelf {
+	display: flex;
+}
+/* Shelved columns are dimmed as a whole; their rows must not dim again
+   on top of that — the eye is the only way back to the matrix, and
+   nested opacity would fade it out of reach. */
+#shelf .column {
+	opacity: 0.5;
+}
+#shelf .hide-toggle {
+	display: inline;
+}
+/* They return to the matrix via the eye, not by dragging. */
+#shelf .drag-handle {
+	display: none;
+}
+#shelf li:hover:not(:has(li:hover)) > .hide-toggle {
+	opacity: 1;
+}
+/* Nothing on the shelf is clickable but the eye. */
+#shelf a {
+	pointer-events: none;
 }

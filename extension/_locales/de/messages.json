@@ -41,9 +41,6 @@
  "fontMonospace": {
   "message": "Monospace"
  },
- "defaultValue": {
-  "message": "Standard"
- },
  "permissionRequest": {
   "message": "Um Lesezeichen-Symbole zwischenzuspeichern, benötigt GNTP Zugriff auf die gespeicherten Websites."
  },
@@ -58,5 +55,20 @@
  },
  "maxColumns": {
   "message": "Spalten pro Zeile"
+ },
+ "onboardEdit": {
+  "message": "Klicke auf ✎︎, um den Bearbeitungsmodus einzuschalten."
+ },
+ "onboardSettings": {
+  "message": "Ziehe am Griff ⠿, um ein Lesezeichen oder einen Ordner zu verschieben.\nKlicke auf 👁︎, um ein Lesezeichen oder einen Ordner auszublenden.\nKlicke auf ⚙︎, um die Einstellungen zu öffnen."
+ },
+ "onboardRoot": {
+  "message": "Wurzelordner – welcher Lesezeichenordner auf dieser Seite angezeigt wird.\nAußerdem: Spalten, Schrift und Sprache.\nKlicke erneut auf ⚙︎, um die Einstellungen zu schließen."
+ },
+ "skip": {
+  "message": "Überspringen"
+ },
+ "onboardExit": {
+  "message": "Klicke auf ✎︎, um den Bearbeitungsmodus zu verlassen."
  }
 }

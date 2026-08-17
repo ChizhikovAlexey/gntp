@@ -7,7 +7,7 @@
 // and persists in localStorage under "folds" while the "Remember open
 // folders" setting is on.
 
-import { loadCsv, saveCsv, storageGet, storageRemove, targetElement } from "./util.js";
+import { eventItem, loadCsv, saveCsv, storageGet, storageRemove, targetElement } from "./util.js";
 
 const KEY = "folds";
 
@@ -57,9 +57,9 @@ export function initFolds(
 	main.addEventListener("click", (e) => {
 		const target = targetElement(e);
 		if (target === null || target.closest("a.folder") === null) return;
-		const li = target.closest<HTMLElement>("li[data-id]");
-		const id = li?.getAttribute("data-id");
-		if (li === null || id === null || id === undefined) return;
+		const item = eventItem(e);
+		if (item === null) return;
+		const { li, id } = item;
 
 		const collapsed = li.classList.toggle("collapsed");
 		// Column roots default to open, nested folders to collapsed.
