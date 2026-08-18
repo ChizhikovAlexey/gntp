@@ -70,5 +70,59 @@
  },
  "onboardExit": {
   "message": "Cliquez sur ✎︎ pour quitter le mode édition."
+ },
+ "itemName": {
+  "message": "Nom"
+ },
+ "itemUrl": {
+  "message": "URL"
+ },
+ "save": {
+  "message": "Enregistrer"
+ },
+ "cancel": {
+  "message": "Annuler"
+ },
+ "invalidUrl": {
+  "message": "URL non valide"
+ },
+ "cantSave": {
+  "message": "Échec de l'enregistrement"
+ },
+ "hiddenFolders": {
+  "message": "Dossiers masqués"
+ },
+ "folder": {
+  "message": "Dossier"
+ },
+ "delete": {
+  "message": "Supprimer"
+ },
+ "deleteQuestion": {
+  "message": "Supprimer {name} ?"
+ },
+ "deleteContents": {
+  "message": "Supprimer aussi tout le contenu"
+ },
+ "andMore": {
+  "message": "… et {n} autres seront supprimés"
+ },
+ "add": {
+  "message": "Ajouter"
+ },
+ "bookmark": {
+  "message": "Marque-page"
+ },
+ "editBookmark": {
+  "message": "Modifier le marque-page"
+ },
+ "editFolder": {
+  "message": "Modifier le dossier"
+ },
+ "createBookmark": {
+  "message": "Nouveau marque-page"
+ },
+ "createFolder": {
+  "message": "Nouveau dossier"
  }
 }

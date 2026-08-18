@@ -70,5 +70,59 @@
  },
  "onboardExit": {
   "message": "✎︎ を押して編集モードを終了してください。"
+ },
+ "itemName": {
+  "message": "名前"
+ },
+ "itemUrl": {
+  "message": "URL"
+ },
+ "save": {
+  "message": "保存"
+ },
+ "cancel": {
+  "message": "キャンセル"
+ },
+ "invalidUrl": {
+  "message": "無効な URL"
+ },
+ "cantSave": {
+  "message": "保存できませんでした"
+ },
+ "hiddenFolders": {
+  "message": "非表示のフォルダー"
+ },
+ "folder": {
+  "message": "フォルダー"
+ },
+ "delete": {
+  "message": "削除"
+ },
+ "deleteQuestion": {
+  "message": "{name} を削除しますか？"
+ },
+ "deleteContents": {
+  "message": "中身もすべて削除"
+ },
+ "andMore": {
+  "message": "ほか {n} 件も削除されます"
+ },
+ "add": {
+  "message": "追加"
+ },
+ "bookmark": {
+  "message": "ブックマーク"
+ },
+ "editBookmark": {
+  "message": "ブックマークを編集"
+ },
+ "editFolder": {
+  "message": "フォルダーを編集"
+ },
+ "createBookmark": {
+  "message": "新しいブックマーク"
+ },
+ "createFolder": {
+  "message": "新しいフォルダー"
  }
 }

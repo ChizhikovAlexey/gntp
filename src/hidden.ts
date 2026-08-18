@@ -14,9 +14,23 @@ export function loadHidden(): Set<string> {
 }
 
 /**
+ * Writes one item's hidden state; true when that changed anything.
+ * Used by the eye toggle here and by column drags onto/off the shelf
+ * (dnd.ts), which are the same action in a different gesture.
+ */
+export function storeHidden(id: string, hidden: boolean): boolean {
+	const ids = loadHidden();
+	if (hidden === ids.has(id)) return false;
+	if (hidden) ids.add(id);
+	else ids.delete(id);
+	saveCsv(KEY, ids);
+	return true;
+}
+
+/**
  * One delegated click listener per root; survives re-renders. Both the
  * matrix and the shelf are passed: the shelf lives outside #main, and
- * its eyes are the only way to put a column back.
+ * its eyes bring columns back (dragging them off the shelf works too).
  *
  * `columnToggled` runs when the toggle hid or revealed a whole column,
  * which moves between the matrix and the shelf (see dnd.ts).
@@ -31,9 +45,7 @@ export function initHidden(
 		if (item === null) return;
 		const { li, id } = item;
 
-		const ids = loadHidden();
-		if (!ids.delete(id)) ids.add(id);
-		saveCsv(KEY, ids);
+		storeHidden(id, !loadHidden().has(id));
 
 		li.classList.toggle("hidden");
 		// Hiding a column's root folder hides the whole column.

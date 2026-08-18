@@ -4,23 +4,39 @@
 //
 // Hidden columns live on the shelf, a container of its own after the
 // matrix (shown in edit mode only), so they stay out of the saved
-// layout, the row cascade and the grid's track sizing entirely. Shelf
-// columns are not draggable and accept no drops: the eye puts them
-// back.
+// layout, the row cascade and the grid's track sizing entirely.
+// Dragging a column onto the shelf hides it and dragging it back into
+// the matrix shows it — the same state change as the eye, in a
+// different gesture. Shelf bookmarks also move as items like any
+// others (items.ts listens on the shelf too).
 //
 // The matrix is reordered live while dragging: hovering a column
-// inserts next to it; dragging past the bottom edge of the last row
-// previews a new tail row. Drop commits (cascading overflow past the
-// row limit), a cancelled drag restores the saved layout. The four
-// listeners are delegated — dragstart and dragend on #main, dragover
-// and drop on the document, whose box also covers the tail-row preview
-// below the matrix — so their number is independent of the columns.
+// inserts next to it; a folder title nests the column inside; the band
+// under the last row previews a new tail row; anything below the
+// matrix box lands the column on the shelf. Drop commits (cascading
+// overflow past the row limit), a cancelled drag restores the saved
+// layout. dragstart and dragend are delegated to #main and the shelf —
+// they hold the handles; dragover and drop live on the document, so
+// the standing preview commits wherever the mouse is released.
 
-import { createEl, setClass, storageGet, storageSet, targetElement } from "./util.js";
+import { moveBookmark } from "./api.js";
+import { storeHidden } from "./hidden.js";
+import {
+	createEl,
+	highlighter,
+	iconSpan,
+	setClass,
+	storageGet,
+	storageSet,
+	targetElement,
+} from "./util.js";
 
 let dragged: HTMLElement | null = null;
 let dropped = false;
 let editing = false;
+// The folder row a drop would move the whole column into (its title
+// hovered); mirrors the drop-into of item drags (items.ts).
+const into = highlighter("drop-into");
 
 export function editMode(): boolean {
 	return editing;
@@ -42,7 +58,12 @@ export function loadLayout(): string[][] {
 	return raw.split("|").map((row) => row.split(",").filter((id) => id !== ""));
 }
 
-function saveLayout(main: HTMLElement): void {
+/**
+ * Persists the matrix as it stands in the DOM. Exported for items.ts,
+ * whose new-column preview (a nested folder dragged into a column gap)
+ * must save the ghost column's slot before the move re-renders.
+ */
+export function saveLayout(main: HTMLElement): void {
 	const rows: string[] = [];
 	for (const row of matrixRows(main)) {
 		const ids: string[] = [];
@@ -132,15 +153,15 @@ export function setColumnHidden(
 export function makeDraggable(column: HTMLElement, id: string, rootLi: Element): void {
 	column.setAttribute("data-id", id);
 	// The extra class keeps items.ts from treating it as an item handle.
-	const handle = createEl("span", "drag-handle column-handle", "⠿");
+	const handle = iconSpan("drag-handle column-handle", "grip");
 	handle.draggable = true;
 	rootLi.insertBefore(handle, rootLi.firstChild);
 }
 
 /**
- * The four delegated listeners; call once. `relayout` re-measures the
- * matrix after a drop — the preview moves columns between rows, which
- * changes how much width each row asks for.
+ * The drag listeners; call once. `relayout` re-measures the matrix
+ * after a drop — the preview moves columns between rows, which changes
+ * how much width each row asks for.
  */
 export function initColumnDnd(
 	main: HTMLElement,
@@ -149,7 +170,7 @@ export function initColumnDnd(
 	restore: () => void,
 	relayout: () => void,
 ): void {
-	main.addEventListener("dragstart", (e) => {
+	const onDragstart = (e: DragEvent): void => {
 		const target = targetElement(e);
 		if (target === null || !target.classList.contains("column-handle")) return;
 		const column = target.closest<HTMLElement>(".column");
@@ -167,49 +188,103 @@ export function initColumnDnd(
 		}
 		dragged = column;
 		dropped = false;
-	});
+	};
+	main.addEventListener("dragstart", onDragstart);
+	shelf.addEventListener("dragstart", onDragstart);
 
 	// On document, not #main: the tail-row preview lives below #main's
 	// box, and the drop must be allowed there too.
 	document.addEventListener("dragover", (e) => {
-		if (activeDrag() === null) return;
+		const column = activeDrag();
+		if (column === null) return;
 		e.preventDefault();
-		const over = targetElement(e)?.closest<HTMLElement>(".column");
-		// A shelf column is no insertion anchor: hovering the shelf acts
-		// like empty space below the matrix.
-		if (over !== null && over !== undefined && !shelf.contains(over)) {
-			if (over === dragged) return;
-			// Left half inserts before the hovered column, right half after.
-			const rect = over.getBoundingClientRect();
-			const after = e.clientX > rect.left + rect.width / 2;
-			moveInto(over.parentElement, after ? over.nextElementSibling : over);
+		const target = targetElement(e);
+		// A folder row's title (any column, matrix or shelf, but never the
+		// dragged column's own subtree) is the nest-into target: dropping
+		// the column there moves the whole folder inside. Everywhere else
+		// keeps the layout gestures below.
+		const nest = target?.closest("a.folder")?.closest<HTMLElement>("li[data-id]") ?? null;
+		if (nest !== null && !column.contains(nest)) {
+			into.set(nest);
+			return;
+		}
+		into.set(null);
+		const over = target?.closest<HTMLElement>(".column") ?? null;
+		// A matrix column under the pointer: reorder within the matrix.
+		if (over !== null && !shelf.contains(over)) {
+			if (over === column) return;
+			insertBeside(over.parentElement, over, e.clientX);
 			// Cascade the row-limit overflow live, as part of the preview.
 			normalizeRows(main, rowLimit());
-		} else {
-			// A new row appears only when the pointer actually leaves the
-			// matrix past its bottom edge; never above the first row.
-			previewTailRow(main, e.clientY);
+			return;
 		}
+		// Everything below the matrix box — the caption, the shelf, the
+		// rest of the page — is the hide zone. The boundary is geometric
+		// (not "over the shelf's elements") and self-stabilizing: the
+		// column previewing onto the shelf shrinks the matrix, moving its
+		// bottom edge *away* from the pointer, so the state latches
+		// instead of flip-flopping as the page reflows under the drag.
+		if (e.clientY > main.getBoundingClientRect().bottom) {
+			if (over !== null && over !== column) {
+				insertBeside(shelf, over, e.clientX);
+			} else if (column.parentElement !== shelf) {
+				// Never re-append a column already previewing on the shelf,
+				// which would jump it to the end on every pointer move.
+				moveInto(shelf, null);
+			}
+			// The matrix may have just lost the column: close its gap.
+			normalizeRows(main, rowLimit());
+			return;
+		}
+		// The narrow band left under the last row (still inside the
+		// matrix box): a new tail row. Its preview grows the matrix down
+		// past the pointer — the same latching, in the other direction.
+		previewTailRow(main, e.clientY);
 	});
 
 	document.addEventListener("drop", (e) => {
-		if (activeDrag() === null) return;
+		const column = activeDrag();
+		if (column === null) return;
 		e.preventDefault();
 		dropped = true;
+		const id = column.getAttribute("data-id");
+		// The highlighted folder wins over layout: the column becomes a
+		// nested folder inside it — a real move in the bookmark store —
+		// and sheds its own hidden flag, which only means something for
+		// top-level columns.
+		const nestId = into.get()?.getAttribute("data-id");
+		if (id !== null && nestId !== undefined && nestId !== null) {
+			into.set(null);
+			storeHidden(id, false);
+			void moveBookmark(id, { parentId: nestId })
+				.catch(() => undefined)
+				.finally(restore);
+			return;
+		}
+		// Landing on the shelf hides the column, leaving it shows it —
+		// the same state the eye toggles, committed by the drop.
+		const hidden = shelf.contains(column);
+		if (id !== null && storeHidden(id, hidden)) {
+			column.classList.toggle("hidden", hidden);
+			column.querySelector(":scope > ul > li")?.classList.toggle("hidden", hidden);
+		}
 		normalizeRows(main, rowLimit());
 		saveLayout(main);
 		relayout();
 	});
 
-	main.addEventListener("dragend", (e) => {
+	const onDragend = (e: DragEvent): void => {
 		if (targetElement(e)?.classList.contains("column-handle") !== true) return;
+		into.set(null);
 		if (dragged !== null) {
 			dragged.classList.remove("dragging");
 			if (!dropped) restore();
 		}
 		dragged = null;
 		dropped = false;
-	});
+	};
+	main.addEventListener("dragend", onDragend);
+	shelf.addEventListener("dragend", onDragend);
 }
 
 /**
@@ -222,8 +297,16 @@ function activeDrag(): HTMLElement | null {
 	if (dragged !== null && !dragged.isConnected) {
 		dragged = null;
 		dropped = false;
+		into.set(null);
 	}
 	return dragged;
+}
+
+/** Puts the dragged column beside `over` — the pointer's half decides. */
+function insertBeside(container: Element | null, over: HTMLElement, x: number): void {
+	const rect = over.getBoundingClientRect();
+	const after = x > rect.left + rect.width / 2;
+	moveInto(container, after ? over.nextElementSibling : over);
 }
 
 /** Moves the dragged column, pruning its old row if that empties it. */
@@ -231,7 +314,18 @@ function moveInto(row: Element | null, before: Element | null): void {
 	if (dragged === null || row === null) return;
 	const from = dragged.parentElement;
 	row.insertBefore(dragged, before);
-	if (from !== null && from !== row && from.children.length === 0) from.remove();
+	// Only matrix rows are disposable. The shelf can also empty out here
+	// (its last column dragged back into the matrix), but it is a
+	// permanent container — removing it would strand every column
+	// hidden afterwards in a detached element, visible nowhere.
+	if (
+		from !== null &&
+		from !== row &&
+		from.children.length === 0 &&
+		from.classList.contains("grid-row")
+	) {
+		from.remove();
+	}
 }
 
 function previewTailRow(main: HTMLElement, y: number): void {

@@ -70,5 +70,59 @@
  },
  "onboardExit": {
   "message": "Click ✎︎ to leave edit mode."
+ },
+ "itemName": {
+  "message": "Name"
+ },
+ "itemUrl": {
+  "message": "URL"
+ },
+ "save": {
+  "message": "Save"
+ },
+ "cancel": {
+  "message": "Cancel"
+ },
+ "invalidUrl": {
+  "message": "Invalid URL"
+ },
+ "cantSave": {
+  "message": "Could not save"
+ },
+ "hiddenFolders": {
+  "message": "Hidden folders"
+ },
+ "folder": {
+  "message": "Folder"
+ },
+ "delete": {
+  "message": "Delete"
+ },
+ "deleteQuestion": {
+  "message": "Delete {name}?"
+ },
+ "deleteContents": {
+  "message": "Also delete all contents"
+ },
+ "andMore": {
+  "message": "… and {n} more will be deleted"
+ },
+ "add": {
+  "message": "Add"
+ },
+ "bookmark": {
+  "message": "Bookmark"
+ },
+ "editBookmark": {
+  "message": "Edit bookmark"
+ },
+ "editFolder": {
+  "message": "Edit folder"
+ },
+ "createBookmark": {
+  "message": "New bookmark"
+ },
+ "createFolder": {
+  "message": "New folder"
  }
 }

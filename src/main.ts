@@ -19,12 +19,25 @@ import {
 	setColumnHidden,
 	setEditMode,
 } from "./dnd.js";
+import { initEdit, openCreate } from "./edit.js";
 import { fitAir } from "./fit.js";
 import { clearFolds, deviations, initFolds, persistFolds } from "./folds.js";
 import { initHidden, loadHidden } from "./hidden.js";
 import * as icons from "./icons.js";
 import { initItems } from "./items.js";
-import { createEl, setClass, storageGet, storageRemove, storageSet } from "./util.js";
+import {
+	appendWithIcons,
+	createEl,
+	fillFolderTree,
+	findNode,
+	iconSpan,
+	setClass,
+	storageGet,
+	storageRemove,
+	storageSet,
+	styleFolderOptions,
+	svgIcon,
+} from "./util.js";
 
 /**
  * Font choices as (i18n key, font-family value): the browser's menu
@@ -110,7 +123,11 @@ const main = document.getElementById("main") as HTMLElement;
  */
 const shelf = createEl("div", "tree");
 shelf.id = "shelf";
-main.after(shelf);
+// Its caption, saying what the strip below the matrix is; localized
+// once the locale is ready (the startup sequence below).
+const shelfLabel = createEl("div");
+shelfLabel.id = "shelf-label";
+main.after(shelfLabel, shelf);
 
 /** Everything render functions need besides the node at hand. */
 interface Render {
@@ -134,13 +151,15 @@ let rootReset: HTMLElement | null = null;
 migrate();
 await initLocale(storageGet("lang"));
 document.title = t("newTabTitle");
-initItems(main, rebuild);
+shelfLabel.textContent = t("hiddenFolders");
+initItems([main, shelf], rebuild);
+initEdit([main, shelf], rebuild);
 initColumnDnd(main, shelf, maxColumns, () => void rebuild(), relayout);
 initHidden([main, shelf], (column, hidden) => {
 	setColumnHidden(main, shelf, column, hidden, maxColumns());
 	relayout();
 });
-initFolds(main, (li, id) => void expandFolder(li, id), relayout);
+initFolds([main, shelf], (li, id) => void expandFolder(li, id), relayout);
 hideBrokenIcons();
 addEventListener("resize", relayout);
 buildSettingsUi();
@@ -163,6 +182,9 @@ async function rebuild(): Promise<void> {
 	shelf.replaceChildren();
 
 	const selected = selectedRoot(root);
+	// The displayed root's id, read by items.ts when a nested folder is
+	// dragged out into a column gap — the move target is this folder.
+	main.setAttribute("data-root", selected.id);
 	fillRootSelector(root, selected.id);
 
 	const ctx = renderCtx();
@@ -177,7 +199,7 @@ async function rebuild(): Promise<void> {
 		loose.length > 0
 			? [{ id: selected.id, title: selected.title === "" ? "/" : selected.title, children: loose }]
 			: [];
-	folders.push(...children.filter((n) => n.children !== undefined && hasBookmarks(n)));
+	folders.push(...children.filter((n) => n.children !== undefined));
 
 	const columns = folders.map((node) => {
 		const column = folderColumn(ctx, node);
@@ -246,22 +268,6 @@ function defaultRoot(root: BookmarkTreeNode): BookmarkTreeNode {
 	return byType ?? findNode(root, "1") ?? root;
 }
 
-function findNode(node: BookmarkTreeNode, id: string): BookmarkTreeNode | null {
-	if (node.id === id) return node;
-	for (const child of node.children ?? []) {
-		const found = findNode(child, id);
-		if (found !== null) return found;
-	}
-	return null;
-}
-
-/** True if the node is a bookmark or a folder that (transitively) contains one. */
-function hasBookmarks(node: BookmarkTreeNode): boolean {
-	if (node.type === "separator") return false;
-	if (node.children === undefined) return node.url !== undefined;
-	return node.children.some(hasBookmarks);
-}
-
 /** A column showing one folder of the displayed root. */
 function folderColumn(ctx: Render, node: BookmarkTreeNode): HTMLElement {
 	const column = createEl("div", "column");
@@ -280,7 +286,9 @@ function renderNode(
 	node: BookmarkTreeNode,
 	withHandle: boolean,
 ): void {
-	if (!hasBookmarks(node)) return;
+	// Separators are the only nodes never rendered; empty folders show —
+	// they are targets for moving bookmarks into.
+	if (node.url === undefined && node.children === undefined) return;
 
 	const li = createEl("li");
 	li.setAttribute("data-id", node.id);
@@ -288,7 +296,7 @@ function renderNode(
 	if (withHandle) {
 		// Kept outside the <a>: Firefox lets the link's native drag win
 		// over a draggable child, which would break row reordering.
-		const handle = createEl("span", "drag-handle", "⠿");
+		const handle = iconSpan("drag-handle", "grip");
 		handle.draggable = true;
 		li.append(handle);
 	}
@@ -312,8 +320,14 @@ function renderNode(
 		a.prepend(icon);
 	}
 	li.append(a);
-	// The eye toggling the item's hidden state; behavior lives in hidden.ts.
-	li.append(createEl("span", "hide-toggle", "👁︎"));
+	// The row's gutter controls: the eye toggling the item's hidden
+	// state (hidden.ts), the pencil opening the item editor, and — on
+	// folder rows alone — the plus creating a new item inside (edit.ts).
+	// Bookmark rows keep the slot empty, so the columns of controls
+	// stay aligned.
+	li.append(iconSpan("hide-toggle", "eye"));
+	li.append(iconSpan("edit-item", "pencil"));
+	if (node.children !== undefined) li.append(iconSpan("add-item", "plus"));
 	if (ctx.hidden.has(node.id)) li.classList.add("hidden");
 
 	if (node.children !== undefined) {
@@ -325,13 +339,25 @@ function renderNode(
 		// Collapsed nested folders render lazily (see expandFolder), so
 		// closed subtrees cost no DOM at all.
 		if (!collapsed || !withHandle) {
-			const inner = createEl("ul");
-			for (const child of node.children) renderNode(ctx, inner, child, true);
-			li.append(inner);
+			li.append(childList(ctx, node.children));
 		}
 	}
 
 	ul.append(li);
+}
+
+/**
+ * The rendered children of an open folder. A folder left with nothing
+ * to show (empty, or separators only) gets an inert placeholder row, so
+ * it still reads as an open folder one can drop bookmarks into.
+ */
+function childList(ctx: Render, children: readonly BookmarkTreeNode[]): HTMLElement {
+	const inner = createEl("ul");
+	for (const child of children) renderNode(ctx, inner, child, true);
+	if (inner.children.length === 0) {
+		inner.append(createEl("li", "empty-note", "<empty>"));
+	}
+	return inner;
 }
 
 /**
@@ -354,10 +380,7 @@ async function expandFolder(li: HTMLElement, id: string): Promise<void> {
 	// a render while fetching.
 	if (node?.children === undefined || li.classList.contains("collapsed")) return;
 	if (li.querySelector(":scope > ul") !== null) return;
-	const ctx = renderCtx();
-	const inner = createEl("ul");
-	for (const child of node.children) renderNode(ctx, inner, child, true);
-	li.append(inner);
+	li.append(childList(renderCtx(), node.children));
 	relayout();
 	if (isFirefox) {
 		icons.flushPrefetch(() => {
@@ -453,11 +476,12 @@ function buildSettingsUi(): void {
 	const head = createEl("div");
 	head.id = "settings-header";
 	settings.append(head);
-	const panel = createEl("div");
+	const panel = createEl("div", "dialog");
 	panel.id = "settings-panel";
 	panel.setAttribute("popover", "");
 	settings.append(panel);
 
+	addCreateToggle(head);
 	addSettingsToggle(head);
 	addEditToggle(head, panel);
 	// Settings the page honors even while the panel was never opened.
@@ -468,6 +492,7 @@ function buildSettingsUi(): void {
 	panel.addEventListener(
 		"beforetoggle",
 		() => {
+			panel.append(createEl("div", "title", t("settings")));
 			addRootSelector(panel);
 			addToggleSetting(panel, t("topLevelFolders"), "show_root", true, (on) =>
 				setClass(main, "no-titles", !on),
@@ -489,17 +514,38 @@ function buildSettingsUi(): void {
 	);
 }
 
+/** One corner button: an icon, a tooltip, a stable id for the CSS. */
+function cornerButton(
+	head: HTMLElement,
+	id: string,
+	icon: Parameters<typeof svgIcon>[0],
+	title: string,
+): HTMLButtonElement {
+	const button = createEl("button");
+	button.append(svgIcon(icon));
+	button.id = id;
+	button.title = title;
+	head.append(button);
+	return button;
+}
+
+/**
+ * The plus left of the gear, edit mode only: opens the item editor in
+ * its create view — a new bookmark or folder (see edit.ts).
+ */
+function addCreateToggle(head: HTMLElement): void {
+	const button = cornerButton(head, "create-toggle", "plus", t("add"));
+	button.addEventListener("click", () => void openCreate(rebuild));
+}
+
 /**
  * The gear next to the pencil, edit mode only. A plain popover trigger:
  * the browser opens and closes the panel (light dismiss and Esc
  * included), no script involved.
  */
 function addSettingsToggle(head: HTMLElement): void {
-	const button = createEl("button", undefined, "⚙︎");
-	button.id = "settings-toggle";
-	button.title = t("settings");
+	const button = cornerButton(head, "settings-toggle", "gear", t("settings"));
 	button.setAttribute("popovertarget", "settings-panel");
-	head.append(button);
 }
 
 /**
@@ -507,10 +553,7 @@ function addSettingsToggle(head: HTMLElement): void {
  * Leaving edit mode also closes the settings popover.
  */
 function addEditToggle(head: HTMLElement, panel: HTMLElement): void {
-	const button = createEl("button", undefined, "✎︎");
-	button.id = "edit-toggle";
-	button.title = t("edit");
-	head.append(button);
+	const button = cornerButton(head, "edit-toggle", "pencil", t("edit"));
 	button.addEventListener("click", () => {
 		const enabled = !editMode();
 		setEditMode(main, enabled);
@@ -543,7 +586,8 @@ function addSettingRow(
 	const row = createEl("label", "row");
 	row.append(createEl("span", undefined, name));
 	row.append(control);
-	const button = createEl("button", "reset off", "⟳");
+	const button = createEl("button", "reset off");
+	button.append(svgIcon("reset"));
 	button.type = "button";
 	button.title = t("resetToDefault");
 	button.addEventListener("click", () => {
@@ -651,10 +695,10 @@ function addRootSelector(panel: HTMLElement): void {
 		void rebuild();
 	});
 
-	select.addEventListener("focus", () => styleRootOptions(select, true));
-	select.addEventListener("blur", () => styleRootOptions(select, false));
+	select.addEventListener("focus", () => styleFolderOptions(select, true));
+	select.addEventListener("blur", () => styleFolderOptions(select, false));
 	select.addEventListener("change", () => {
-		styleRootOptions(select, false);
+		styleFolderOptions(select, false);
 		storageSet("root", select.value);
 		void rebuild();
 	});
@@ -664,51 +708,12 @@ function addRootSelector(panel: HTMLElement): void {
 function fillRootSelector(root: BookmarkTreeNode, selectedId: string): void {
 	const select = rootSelect;
 	if (select === null) return;
-	select.replaceChildren();
-	addFolderOption(select, root, "/", 0);
+	fillFolderTree(select, root);
 	select.value = selectedId;
-	styleRootOptions(select, false);
+	styleFolderOptions(select, false);
 	// The reset control clears the stored choice, so it shows whenever
 	// there is one — even if it happens to name the default folder.
 	syncReset(rootReset, storageGet("root") === null);
-}
-
-function addFolderOption(
-	select: HTMLSelectElement,
-	node: BookmarkTreeNode,
-	label: string,
-	depth: number,
-): void {
-	const option = createEl("option");
-	option.value = node.id;
-	// Both spellings of the name: indented for the open list, plain for
-	// the closed control (styleRootOptions swaps between them).
-	const indented = "  ".repeat(depth) + label;
-	option.setAttribute("data-indented", indented);
-	option.setAttribute("data-label", label);
-	option.textContent = indented;
-	select.append(option);
-
-	for (const child of node.children ?? []) {
-		if (child.children !== undefined) {
-			addFolderOption(select, child, child.title === "" ? "…" : child.title, depth + 1);
-		}
-	}
-}
-
-/**
- * Swaps the root-selector option texts: the open dropdown shows the
- * depth-indented tree; the closed control shows the selected folder's
- * plain name, with no indentation around it.
- */
-function styleRootOptions(select: HTMLSelectElement, open: boolean): void {
-	for (const option of select.options) {
-		const indented = option.getAttribute("data-indented");
-		const label = option.getAttribute("data-label");
-		if (indented === null || label === null) continue;
-		const selected = option.value === select.value;
-		option.textContent = selected && !open ? label : indented;
-	}
 }
 
 /** How many columns fit in one matrix row before wrapping. */
@@ -887,9 +892,15 @@ function maybeOnboard(): void {
 	card.id = "onboarding";
 	// A step's message is a list: one instruction per "\n"-joined line.
 	const text = createEl("ul", "hint");
+	// The control glyphs in the message render as the same SVG icons the
+	// controls themselves draw (see appendWithIcons).
 	const setText = (key: string): void => {
 		text.replaceChildren();
-		for (const line of t(key).split("\n")) text.append(createEl("li", undefined, line));
+		for (const line of t(key).split("\n")) {
+			const item = createEl("li");
+			appendWithIcons(item, line);
+			text.append(item);
+		}
 	};
 	card.append(text);
 	const button = createEl("button", undefined, t("skip"));
@@ -986,7 +997,8 @@ function addPermissionPrompt(): void {
 	banner.append(createEl("span", undefined, t("permissionRequest")));
 	const allow = createEl("button", undefined, t("allow"));
 	banner.append(allow);
-	const dismiss = createEl("button", "dismiss", "✕");
+	const dismiss = createEl("button", "dismiss");
+	dismiss.append(svgIcon("cross"));
 	banner.append(dismiss);
 	document.body.append(banner);
 

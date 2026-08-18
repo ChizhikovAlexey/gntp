@@ -2,7 +2,7 @@
 	"manifest_version": 3,
 	"name": "Good New Tab Page",
 	"short_name": "GNTP",
-	"version": "1.2.0",
+	"version": "1.3.0",
 	"description": "__MSG_extDescription__",
 	"default_locale": "en",
 	"author": "ChizhikovAlexey",

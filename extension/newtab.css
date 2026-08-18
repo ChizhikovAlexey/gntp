@@ -12,6 +12,13 @@ body {
 	background: Canvas;
 	color: CanvasText;
 }
+/* Form controls have browser-private fonts of their own; every control
+   speaks in the page's voice instead, size and family alike. */
+button,
+input,
+select {
+	font: inherit;
+}
 /* The matrix owns the column tracks so every row shares them: column N
    has one width across all rows, like a table. --cols is the longest
    row's length, written by syncTracks(); the 0 minimum lets tracks
@@ -32,10 +39,12 @@ body {
 	   cannot use: centering splits it evenly, so the matrix shifts left
 	   by half and the text — not the card — stays symmetric. */
 	padding-right: calc(24px + var(--gutter) - var(--pad));
-	/* The card's air, equal on both sides at rest. fitAir() shrinks it
-	   when the page runs short: --pad first, since nothing lives there,
-	   and only then --gutter, which holds the eye and the drag handle. */
-	--gutter: 3.5em;
+	/* The card's air. fitAir() shrinks it when the page runs short:
+	   --pad first, since nothing lives there, and only then --gutter,
+	   which holds the eye, pencil, plus and drag handle. The gutter is
+	   the wider of the two; the padding-right above reserves the
+	   difference, so the text itself stays centered. */
+	--gutter: 4.6em;
 	--pad: 3.5em;
 }
 /* The probe pass of fitAir(): tracks take their full content width, so
@@ -68,7 +77,7 @@ ul {
 	list-style: none;
 }
 /* Indentation comes from each row's own left padding (the gutter for
-   the eye and drag handle), not from the lists: this keeps the controls
+   the row controls), not from the lists: this keeps the controls
    inside the row's box, so hover, the card and the drag snapshot all
    agree on its geometry. */
 .tree ul {
@@ -82,8 +91,8 @@ ul {
 	margin: -3px .4em 0 0;
 	vertical-align: middle;
 }
-/* Settings, top-right: a lone edit pencil; in edit mode a gear appears
-   next to it, and only the gear unfolds the panel of "name — control —
+/* Settings, top-right: a lone edit pencil; edit mode adds the plus
+   (new item) and the gear, which unfolds the panel of "name — control —
    reset" rows. All colors derive from the theme palette
    (Canvas/CanvasText), never hardcoded. */
 #settings {
@@ -92,9 +101,11 @@ ul {
 	right: 8px;
 	text-align: right;
 }
-/* The floating surfaces — settings panel, permission banner, onboarding
-   card — share one chrome; only placement and inner layout differ. */
+/* The floating surfaces — settings panel, item editor, permission
+   banner, onboarding card — share one chrome; only placement and inner
+   layout differ. */
 #settings-panel,
+#item-editor,
 #permission-banner,
 #onboarding {
 	position: fixed;
@@ -103,42 +114,62 @@ ul {
 	border-radius: 8px;
 	box-shadow: 0 2px 8px color-mix(in srgb, CanvasText 15%, transparent);
 }
+/* The two dialog windows — the settings panel and the item editor —
+   are one component: the chrome above plus one padding, row rhythm and
+   heading; only placement and column templates differ below. */
+.dialog {
+	padding: 10px;
+	gap: 8px 16px;
+	align-items: center;
+}
+.dialog:popover-open {
+	display: grid;
+}
+/* The window's heading: quiet, and set off from the rows by air and a
+   hairline so it reads as the window's name, not the first item. */
+.dialog > .title {
+	grid-column: 1 / -1;
+	/* Left in both windows: the settings corner sets text-align: right,
+	   which the panel would inherit. */
+	text-align: left;
+	font-size: 0.95em;
+	font-weight: 500;
+	opacity: 0.75;
+	padding-bottom: 6px;
+	border-bottom: 1px solid color-mix(in srgb, CanvasText 15%, transparent);
+}
 /* The settings popover: the browser manages opening, light dismiss and
    Esc (popovertarget on the gear); only look and placement are ours. */
 #settings-panel {
 	inset: 3.2em 8px auto auto;
 	margin: 0;
-	padding: 10px;
 	/* Shared columns — name, control, reset — sized independently:
 	   they can never intersect. */
 	grid-template-columns: max-content auto max-content;
-	gap: 8px 16px;
-	align-items: center;
 }
-#settings-panel:popover-open {
-	display: grid;
-}
-/* Every glyph button on the page — the two corner toggles, the per-row
-   reset, the banner's dismiss: bare text that lights up on hover. */
+/* Every icon button on the page — the corner toggles, the per-row
+   reset, the banner's dismiss: bare shapes that light up on hover. */
 #edit-toggle,
 #settings-toggle,
+#create-toggle,
 #settings .reset,
 #permission-banner .dismiss {
 	border: none;
 	background: none;
-	font: inherit;
 	color: inherit;
 	cursor: pointer;
 	opacity: 0.4;
 }
 #edit-toggle:hover,
 #settings-toggle:hover,
+#create-toggle:hover,
 #settings .reset:hover,
 #permission-banner .dismiss:hover {
 	opacity: 1;
 }
 #edit-toggle,
-#settings-toggle {
+#settings-toggle,
+#create-toggle {
 	font-size: 1.25em;
 	padding: 2px 8px;
 	border-radius: 6px;
@@ -147,11 +178,14 @@ ul {
 	opacity: 1;
 	background: color-mix(in srgb, CanvasText 12%, transparent);
 }
-/* The gear exists only in edit mode; it highlights while the panel is open. */
-#settings-toggle {
+/* The gear and the plus exist only in edit mode; the gear highlights
+   while the panel is open. */
+#settings-toggle,
+#create-toggle {
 	display: none;
 }
-#main.editing ~ #settings #settings-toggle {
+#main.editing ~ #settings #settings-toggle,
+#main.editing ~ #settings #create-toggle {
 	display: inline-block;
 	margin-right: 6px;
 }
@@ -209,6 +243,155 @@ ul {
 }
 #settings .row input[type="checkbox"]:checked::before {
 	left: calc(100% - 1.05em);
+}
+
+/* The item editor (edit.ts): the settings panel's row grid — name,
+   control — with a button row below. Anchored near the top of the page
+   (the customary dialog placement, ~15% down) rather than centered:
+   the top edge is fixed, so a view that changes height — the delete
+   confirmation with its item list — grows downward only, instead of
+   jumping around a moving center. */
+#item-editor {
+	inset: 15vh 0 auto;
+	margin: 0 auto;
+	max-height: calc(85vh - 24px);
+	width: min(28em, calc(100vw - 32px));
+	grid-template-columns: max-content minmax(0, 1fr);
+}
+/* The create view's tabs: bookmark or folder, icon and name each; the
+   active one carries the accent underline. */
+#item-editor .tabs {
+	grid-column: 1 / -1;
+	display: none;
+	gap: 4px;
+}
+#item-editor.creating .tabs {
+	display: flex;
+}
+#item-editor .tab {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 4px 10px;
+	border: none;
+	border-bottom: 2px solid transparent;
+	background: none;
+	color: inherit;
+	opacity: 0.55;
+	cursor: pointer;
+}
+#item-editor .tab:hover {
+	opacity: 0.85;
+}
+#item-editor .tab.on {
+	opacity: 1;
+	border-bottom-color: AccentColor;
+}
+#item-editor .tab > svg {
+	display: block;
+	width: 1em;
+	height: 1em;
+	fill: currentColor;
+	pointer-events: none;
+}
+/* Creating has nothing to delete. */
+#item-editor.creating > .buttons > .delete {
+	display: none;
+}
+#item-editor .row {
+	display: contents;
+	white-space: nowrap;
+}
+#item-editor .row > span:first-child {
+	opacity: 0.7;
+	justify-self: start;
+	text-align: left;
+}
+#item-editor .row :is(input, select) {
+	min-width: 0;
+	width: 100%;
+	box-sizing: border-box;
+}
+/* The URL field wears the site's icon over its left padding; the icon
+   is revealed only by a successful load (see edit.ts). */
+#item-editor .url-box {
+	position: relative;
+	display: block;
+	min-width: 0;
+}
+#item-editor .url-box > input {
+	padding-left: 26px;
+}
+#item-editor .url-icon {
+	position: absolute;
+	left: 6px;
+	top: 50%;
+	transform: translateY(-50%);
+	width: 16px;
+	height: 16px;
+	pointer-events: none;
+}
+/* Folders have no URL: the row disappears whole (both grid cells). */
+#item-editor .row.off {
+	display: none;
+}
+#item-editor .buttons {
+	grid-column: 1 / -1;
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+}
+/* Delete stands apart from cancel/save on the far left. */
+#item-editor > .buttons > .delete {
+	margin-right: auto;
+}
+/* The delete-confirmation view is swapped in over the form rows. */
+#item-editor .confirm {
+	display: none;
+	grid-column: 1 / -1;
+}
+#item-editor.confirming .row,
+#item-editor.confirming > .buttons {
+	display: none;
+}
+#item-editor.confirming .confirm {
+	display: block;
+}
+#item-editor .confirm .contents {
+	display: block;
+	margin-top: 10px;
+}
+/* Kept last: it must beat the display of any confirm part it hides —
+   the contents checkbox for bookmarks and empty folders, the item
+   list while contents are kept. */
+#item-editor .confirm .off {
+	display: none;
+}
+/* The first few items the deletion covers, favicons and all — quieter
+   than the form text: smaller and dimmed, still the theme's CanvasText. */
+#item-editor .confirm .preview {
+	list-style: none;
+	margin: 8px 0 0;
+	padding: 0 0 0 16px;
+	font-size: 0.85em;
+	line-height: 1.9;
+	opacity: 0.65;
+}
+#item-editor .confirm .preview > li {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+/* "…and N more will be deleted", when the preview does not cover
+   everything; aligned under the list. */
+#item-editor .confirm .more {
+	margin-top: 2px;
+	padding-left: 16px;
+	font-size: 0.85em;
+	opacity: 0.6;
+}
+#item-editor .confirm .buttons {
+	margin-top: 12px;
 }
 
 /* First-run banner asking for the icon-cache host permission. */
@@ -310,6 +493,19 @@ ul {
 #main.no-titles .column > ul > li.collapsed > ul {
 	display: block;
 }
+/* The placeholder row of an open empty folder. Inert: it neither takes
+   the pointer (hovering it highlights the folder card itself, and drops
+   land on the folder) nor carries the row controls. */
+.tree li.empty-note {
+	opacity: 0.4;
+	pointer-events: none;
+}
+/* While a dragged row previews inside an empty folder it sits right
+   before the placeholder, which yields its place meanwhile — the folder
+   must not read as empty with a row shown in it. */
+.tree li.dragging + li.empty-note {
+	display: none;
+}
 
 /* A row: the link is a full-width block, the nested folder list flows
    below it; the eye and handle live absolutely positioned in the
@@ -336,7 +532,7 @@ ul {
 
 /* One uniform card model: every li (bookmark row, folder block, column
    root) is a card; hovering the innermost li shows the backdrop and its
-   two gutter controls, vertically centered left of the card. */
+   gutter controls, vertically centered left of the card. */
 .dragging,
 #shelf li:hover:not(:has(li:hover)),
 #main.editing:not(:has(.dragging)) li:hover:not(:has(li:hover)) {
@@ -345,14 +541,17 @@ ul {
 	border-radius: 6px;
 }
 
-/* The folder a dragged bookmark would drop into (middle of its header);
-   accent-tinted to read as "inside", unlike the insertion preview. */
-#main li.drop-into > .folder {
+/* The folder a dragged bookmark or column would drop into (its
+   header); accent-tinted to read as "inside", unlike the insertion
+   preview. Matrix and shelf alike. */
+.tree li.drop-into > .folder {
 	background: color-mix(in srgb, AccentColor 25%, transparent);
 	border-radius: 6px;
 }
 
 .hide-toggle,
+.edit-item,
+.add-item,
 .drag-handle {
 	display: none;
 	position: absolute;
@@ -361,10 +560,41 @@ ul {
 	user-select: none;
 	opacity: 0;
 }
-/* Anchored to the gutter's inner edge so both stay inside it as it
-   shrinks; at the full 3.5em they resolve to 0.7em and 2.3em. */
+/* All UI icons are inline SVGs (see svgIcon in util.ts): one size in
+   every browser, unlike font glyphs. Click-inert, so the delegated
+   listeners see the icon's host as the event target. */
+:is(
+	.hide-toggle, .edit-item, .add-item, .drag-handle,
+	#edit-toggle, #settings-toggle, #create-toggle, #settings .reset, #permission-banner .dismiss
+) > svg {
+	display: block;
+	width: 1em;
+	height: 1em;
+	fill: currentColor;
+	pointer-events: none;
+}
+/* Icons inline in onboarding text sit on the baseline like the glyphs
+   they replace. */
+.inline-icon > svg {
+	display: inline-block;
+	width: 1em;
+	height: 1em;
+	fill: currentColor;
+	vertical-align: -0.125em;
+}
+/* Anchored to the gutter's inner edge so all four stay inside it as it
+   shrinks; at the full 4.6em they resolve to 0.1em, 1.2em, 2.3em and
+   3.4em. */
 .hide-toggle {
-	left: max(0.1em, calc(var(--gutter) - 2.8em));
+	left: max(0.1em, calc(var(--gutter) - 4.5em));
+	cursor: pointer;
+}
+.edit-item {
+	left: calc(var(--gutter) - 3.4em);
+	cursor: pointer;
+}
+.add-item {
+	left: calc(var(--gutter) - 2.3em);
 	cursor: pointer;
 }
 .drag-handle {
@@ -372,10 +602,12 @@ ul {
 	cursor: grab;
 }
 #main.editing .hide-toggle,
+#main.editing .edit-item,
+#main.editing .add-item,
 #main.editing .drag-handle {
 	display: inline;
 }
-#main.editing:not(:has(.dragging)) li:hover:not(:has(li:hover)) > :is(.hide-toggle, .drag-handle) {
+#main.editing:not(:has(.dragging)) li:hover:not(:has(li:hover)) > :is(.hide-toggle, .edit-item, .add-item, .drag-handle) {
 	opacity: 1;
 }
 /* Hidden folders exist in the DOM but show only in edit mode. */
@@ -396,14 +628,33 @@ ul {
 	column-gap: 1em;
 	line-height: 2;
 	margin: 0 24px 4vh;
-	padding-top: 1em;
-	border-top: 1px dashed color-mix(in srgb, CanvasText 25%, transparent);
+	padding-top: 0.4em;
 	/* Its rows carry the same controls as the matrix ones. */
-	--gutter: 3.5em;
+	--gutter: 4.6em;
 	--pad: 3.5em;
+}
+/* The shelf's caption: the dashed separator moved here, with the name
+   of what lies below it. */
+#shelf-label {
+	display: none;
+	text-align: center;
+	opacity: 0.5;
+	margin: 0 24px;
+	padding-top: 0.6em;
+	border-top: 1px dashed color-mix(in srgb, CanvasText 25%, transparent);
+}
+#main.editing ~ #shelf-label {
+	display: block;
 }
 #main.editing ~ #shelf {
 	display: flex;
+}
+/* An empty shelf stays a visible drop target in edit mode: the strip
+   keeps a row of height and labels itself, like an empty folder. */
+#shelf:empty::after {
+	content: "<empty>";
+	opacity: 0.4;
+	line-height: 2;
 }
 /* Shelved columns are dimmed as a whole; their rows must not dim again
    on top of that — the eye is the only way back to the matrix, and
@@ -411,17 +662,20 @@ ul {
 #shelf .column {
 	opacity: 0.5;
 }
-#shelf .hide-toggle {
+/* Shelf rows carry the full set of controls: the eye brings a column
+   back, hidden items can be edited and dragged — into other shelf
+   folders or out into the matrix — and whole columns drag back into
+   the matrix by their handle (equivalent to the eye showing them). */
+#shelf .hide-toggle,
+#shelf .edit-item,
+#shelf .add-item,
+#shelf .drag-handle {
 	display: inline;
 }
-/* They return to the matrix via the eye, not by dragging. */
-#shelf .drag-handle {
-	display: none;
-}
-#shelf li:hover:not(:has(li:hover)) > .hide-toggle {
+#shelf li:hover:not(:has(li:hover)) > :is(.hide-toggle, .edit-item, .add-item, .drag-handle) {
 	opacity: 1;
 }
-/* Nothing on the shelf is clickable but the eye. */
-#shelf a {
+/* Shelf links must not navigate; folder headers (no href) still fold. */
+#shelf a[href] {
 	pointer-events: none;
 }

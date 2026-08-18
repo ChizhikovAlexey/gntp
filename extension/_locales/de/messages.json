@@ -70,5 +70,59 @@
  },
  "onboardExit": {
   "message": "Klicke auf ✎︎, um den Bearbeitungsmodus zu verlassen."
+ },
+ "itemName": {
+  "message": "Name"
+ },
+ "itemUrl": {
+  "message": "URL"
+ },
+ "save": {
+  "message": "Speichern"
+ },
+ "cancel": {
+  "message": "Abbrechen"
+ },
+ "invalidUrl": {
+  "message": "Ungültige URL"
+ },
+ "cantSave": {
+  "message": "Speichern fehlgeschlagen"
+ },
+ "hiddenFolders": {
+  "message": "Ausgeblendete Ordner"
+ },
+ "folder": {
+  "message": "Ordner"
+ },
+ "delete": {
+  "message": "Löschen"
+ },
+ "deleteQuestion": {
+  "message": "{name} löschen?"
+ },
+ "deleteContents": {
+  "message": "Auch den gesamten Inhalt löschen"
+ },
+ "andMore": {
+  "message": "… und {n} weitere werden gelöscht"
+ },
+ "add": {
+  "message": "Hinzufügen"
+ },
+ "bookmark": {
+  "message": "Lesezeichen"
+ },
+ "editBookmark": {
+  "message": "Lesezeichen bearbeiten"
+ },
+ "editFolder": {
+  "message": "Ordner bearbeiten"
+ },
+ "createBookmark": {
+  "message": "Neues Lesezeichen"
+ },
+ "createFolder": {
+  "message": "Neuer Ordner"
  }
 }

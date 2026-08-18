@@ -70,5 +70,59 @@
  },
  "onboardExit": {
   "message": "Pulsa ✎︎ para salir del modo de edición."
+ },
+ "itemName": {
+  "message": "Nombre"
+ },
+ "itemUrl": {
+  "message": "URL"
+ },
+ "save": {
+  "message": "Guardar"
+ },
+ "cancel": {
+  "message": "Cancelar"
+ },
+ "invalidUrl": {
+  "message": "URL no válida"
+ },
+ "cantSave": {
+  "message": "No se pudo guardar"
+ },
+ "hiddenFolders": {
+  "message": "Carpetas ocultas"
+ },
+ "folder": {
+  "message": "Carpeta"
+ },
+ "delete": {
+  "message": "Eliminar"
+ },
+ "deleteQuestion": {
+  "message": "¿Eliminar {name}?"
+ },
+ "deleteContents": {
+  "message": "Eliminar también todo el contenido"
+ },
+ "andMore": {
+  "message": "… y {n} más serán eliminados"
+ },
+ "add": {
+  "message": "Añadir"
+ },
+ "bookmark": {
+  "message": "Marcador"
+ },
+ "editBookmark": {
+  "message": "Editar marcador"
+ },
+ "editFolder": {
+  "message": "Editar carpeta"
+ },
+ "createBookmark": {
+  "message": "Nuevo marcador"
+ },
+ "createFolder": {
+  "message": "Nueva carpeta"
  }
 }

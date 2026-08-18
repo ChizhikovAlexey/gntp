@@ -5,6 +5,8 @@
 interface BookmarkTreeNode {
 	readonly id: string;
 	readonly title: string;
+	/** The folder holding this node; absent on the root. */
+	readonly parentId?: string;
 	/** Position among siblings in the parent folder; absent on the root. */
 	readonly index?: number;
 	readonly url?: string;
@@ -20,9 +22,14 @@ interface BookmarkTreeNode {
 
 interface WebExtension {
 	readonly bookmarks: {
+		create(details: { parentId?: string; title?: string; url?: string }): Promise<unknown>;
+		get(id: string): Promise<readonly BookmarkTreeNode[]>;
 		getTree(): Promise<readonly BookmarkTreeNode[]>;
 		getSubTree(id: string): Promise<readonly BookmarkTreeNode[]>;
 		move(id: string, destination: { parentId?: string; index?: number }): Promise<unknown>;
+		remove(id: string): Promise<unknown>;
+		removeTree(id: string): Promise<unknown>;
+		update(id: string, changes: { title?: string; url?: string }): Promise<unknown>;
 	};
 	readonly i18n: {
 		getMessage(key: string): string;

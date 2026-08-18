@@ -18,6 +18,16 @@ export async function getTree(): Promise<BookmarkTreeNode> {
 	return root;
 }
 
+/** The node with the given id (no children), or null when it is gone. */
+export async function getBookmark(id: string): Promise<BookmarkTreeNode | null> {
+	try {
+		const [node] = await ext.bookmarks.get(id);
+		return node ?? null;
+	} catch {
+		return null;
+	}
+}
+
 /** The subtree rooted at the given folder, or null when it is gone. */
 export async function getSubTree(id: string): Promise<BookmarkTreeNode | null> {
 	try {
@@ -39,6 +49,41 @@ export function moveBookmark(
 	destination: { parentId?: string; index?: number },
 ): Promise<unknown> {
 	return ext.bookmarks.move(id, destination);
+}
+
+/**
+ * Renames a bookmark or folder and, for bookmarks, replaces its URL — a
+ * real change in the browser's bookmark store, like moveBookmark().
+ * Rejects when the store refuses the change (a malformed URL, a
+ * permanent folder).
+ */
+export function updateBookmark(
+	id: string,
+	changes: { title: string; url?: string },
+): Promise<unknown> {
+	return ext.bookmarks.update(id, changes);
+}
+
+/**
+ * Creates a bookmark — or, without a URL, a folder — appended to the
+ * given parent in the bookmark store.
+ */
+export function createBookmark(details: {
+	parentId: string;
+	title: string;
+	url?: string;
+}): Promise<unknown> {
+	return ext.bookmarks.create(details);
+}
+
+/** Deletes a bookmark or an empty folder from the bookmark store. */
+export function removeBookmark(id: string): Promise<unknown> {
+	return ext.bookmarks.remove(id);
+}
+
+/** Deletes a folder with everything in it, recursively. */
+export function removeBookmarkTree(id: string): Promise<unknown> {
+	return ext.bookmarks.removeTree(id);
 }
 
 const ALL_URLS = { origins: ["<all_urls>"] } as const;

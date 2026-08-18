@@ -70,5 +70,59 @@
  },
  "onboardExit": {
   "message": "Нажмите ✎︎, чтобы выйти из режима редактирования."
+ },
+ "itemName": {
+  "message": "Название"
+ },
+ "itemUrl": {
+  "message": "URL"
+ },
+ "save": {
+  "message": "Сохранить"
+ },
+ "cancel": {
+  "message": "Отмена"
+ },
+ "invalidUrl": {
+  "message": "Неверный URL"
+ },
+ "cantSave": {
+  "message": "Не удалось сохранить"
+ },
+ "hiddenFolders": {
+  "message": "Скрытые папки"
+ },
+ "folder": {
+  "message": "Папка"
+ },
+ "delete": {
+  "message": "Удалить"
+ },
+ "deleteQuestion": {
+  "message": "Удалить {name}?"
+ },
+ "deleteContents": {
+  "message": "Удалить и всё содержимое"
+ },
+ "andMore": {
+  "message": "и ещё {n} элементов будет удалено"
+ },
+ "add": {
+  "message": "Добавить"
+ },
+ "bookmark": {
+  "message": "Закладка"
+ },
+ "editBookmark": {
+  "message": "Редактирование закладки"
+ },
+ "editFolder": {
+  "message": "Редактирование папки"
+ },
+ "createBookmark": {
+  "message": "Создание закладки"
+ },
+ "createFolder": {
+  "message": "Создание папки"
  }
 }

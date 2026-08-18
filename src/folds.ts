@@ -45,16 +45,17 @@ export function clearFolds(): void {
 }
 
 /**
- * One delegated click listener on #main; survives re-renders. Nested
+ * One delegated click listener per root (#main and the shelf, where
+ * hidden folders unfold the same way); survives re-renders. Nested
  * folders render lazily (HNTP-style, to keep the DOM small): `expand`
  * builds a folder's children on open, and collapsing removes them.
  */
 export function initFolds(
-	main: HTMLElement,
+	roots: readonly HTMLElement[],
 	expand: (li: HTMLElement, id: string) => void,
 	toggled: () => void,
 ): void {
-	main.addEventListener("click", (e) => {
+	const onClick = (e: Event): void => {
 		const target = targetElement(e);
 		if (target === null || target.closest("a.folder") === null) return;
 		const item = eventItem(e);
@@ -77,5 +78,6 @@ export function initFolds(
 		// Folding changes what is displayed, hence the widths; expand
 		// reports its own result once its fetch lands.
 		toggled();
-	});
+	};
+	for (const root of roots) root.addEventListener("click", onClick);
 }

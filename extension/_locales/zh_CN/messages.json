@@ -70,5 +70,59 @@
  },
  "onboardExit": {
   "message": "点击 ✎︎ 退出编辑模式。"
+ },
+ "itemName": {
+  "message": "名称"
+ },
+ "itemUrl": {
+  "message": "网址"
+ },
+ "save": {
+  "message": "保存"
+ },
+ "cancel": {
+  "message": "取消"
+ },
+ "invalidUrl": {
+  "message": "无效的网址"
+ },
+ "cantSave": {
+  "message": "无法保存"
+ },
+ "hiddenFolders": {
+  "message": "隐藏的文件夹"
+ },
+ "folder": {
+  "message": "文件夹"
+ },
+ "delete": {
+  "message": "删除"
+ },
+ "deleteQuestion": {
+  "message": "删除 {name}？"
+ },
+ "deleteContents": {
+  "message": "同时删除所有内容"
+ },
+ "andMore": {
+  "message": "… 及另外 {n} 项也将被删除"
+ },
+ "add": {
+  "message": "添加"
+ },
+ "bookmark": {
+  "message": "书签"
+ },
+ "editBookmark": {
+  "message": "编辑书签"
+ },
+ "editFolder": {
+  "message": "编辑文件夹"
+ },
+ "createBookmark": {
+  "message": "新建书签"
+ },
+ "createFolder": {
+  "message": "新建文件夹"
  }
 }
