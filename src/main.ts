@@ -1,6 +1,7 @@
 // GNTP entry point: renders the bookmark columns and the settings UI.
 
 import {
+	chromiumFaviconUrl,
 	getSubTree,
 	getTree,
 	hasHostPermission,
@@ -395,9 +396,7 @@ async function expandFolder(li: HTMLElement, id: string): Promise<void> {
  */
 function favicon(page: string): string | null {
 	if (!page.startsWith("http://") && !page.startsWith("https://")) return null;
-	if (!isFirefox) {
-		return `/_favicon/?pageUrl=${encodeURIComponent(page)}&size=32`;
-	}
+	if (!isFirefox) return chromiumFaviconUrl(page);
 	const origin = new URL(page).origin;
 	const entry = icons.cached(origin);
 	switch (entry.state) {

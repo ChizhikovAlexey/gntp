@@ -16,6 +16,7 @@
 // casual new tab never pays its DOM.
 
 import {
+	chromiumFaviconUrl,
 	createBookmark,
 	getBookmark,
 	getSubTree,
@@ -405,7 +406,7 @@ function faviconSrc(page: string): string | null {
 	} catch {
 		return null;
 	}
-	if (!isFirefox) return `/_favicon/?pageUrl=${encodeURIComponent(page)}&size=32`;
+	if (!isFirefox) return chromiumFaviconUrl(page);
 	const entry = icons.cached(origin);
 	return entry.state === "fresh" || entry.state === "stale"
 		? icons.objectUrlFor(origin, entry.data)

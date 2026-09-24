@@ -39,6 +39,9 @@ interface WebExtension {
 		contains(query: { origins: readonly string[] }): Promise<boolean>;
 		request(query: { origins: readonly string[] }): Promise<boolean>;
 	};
+	readonly runtime: {
+		getURL(path: string): string;
+	};
 }
 
 declare var browser: WebExtension | undefined;

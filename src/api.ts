@@ -11,6 +11,19 @@ const ext: WebExtension = (typeof browser !== "undefined" ? browser : chrome)!;
  */
 export const isFirefox = location.protocol === "moz-extension:";
 
+/**
+ * Chromium's own favicon store, read through the extension's _favicon
+ * endpoint: what the "favicon" permission in the Chromium manifest is
+ * for (build.sh adds it there). The size is what the 16px slot looks
+ * crisp with on HiDPI screens.
+ */
+export function chromiumFaviconUrl(page: string): string {
+	const url = new URL(ext.runtime.getURL("/_favicon/"));
+	url.searchParams.set("pageUrl", page);
+	url.searchParams.set("size", "32");
+	return url.toString();
+}
+
 /** The root node of the bookmarks tree. */
 export async function getTree(): Promise<BookmarkTreeNode> {
 	const [root] = await ext.bookmarks.getTree();
