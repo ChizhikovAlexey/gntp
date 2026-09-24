@@ -7,7 +7,15 @@
 // and persists in localStorage under "folds" while the "Remember open
 // folders" setting is on.
 
-import { eventItem, loadCsv, saveCsv, storageGet, storageRemove, targetElement } from "./util.js";
+import {
+	eventItem,
+	isColumnRoot,
+	loadCsv,
+	saveCsv,
+	storageGet,
+	storageRemove,
+	targetElement,
+} from "./util.js";
 
 const KEY = "folds";
 
@@ -64,7 +72,7 @@ export function initFolds(
 
 		const collapsed = li.classList.toggle("collapsed");
 		// Column roots default to open, nested folders to collapsed.
-		const isRoot = li.matches(".column > ul > li");
+		const isRoot = isColumnRoot(li);
 		const deviated = collapsed === isRoot;
 		const set = deviationSet();
 		if (deviated) set.add(id);

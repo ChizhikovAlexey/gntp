@@ -24,6 +24,20 @@ export function storageRemove(key: string): void {
 	}
 }
 
+/** The stored keys starting with `prefix`; none when storage is unavailable. */
+export function storageKeys(prefix: string): string[] {
+	const keys: string[] = [];
+	try {
+		for (let i = 0; i < localStorage.length; i++) {
+			const key = localStorage.key(i);
+			if (key !== null && key.startsWith(prefix)) keys.push(key);
+		}
+	} catch {
+		/* unavailable: nothing is stored */
+	}
+	return keys;
+}
+
 /** A stored comma-separated id list (ids never contain commas). */
 export function loadCsv(key: string): string[] {
 	const value = storageGet(key);
@@ -37,6 +51,35 @@ export function saveCsv(key: string, values: Iterable<string>): void {
 /** The event target as an Element, or null. */
 export function targetElement(e: Event): Element | null {
 	return e.target instanceof Element ? e.target : null;
+}
+
+/** The element the pointer last went down on: where a drag begins. */
+let pressed: Element | null = null;
+// Recorded at the press: dragstart fires only once the pointer has
+// crossed the drag threshold and reports that point, a few pixels off
+// the press, so what lies under it then is not what was pressed.
+document.addEventListener("pointerdown", (e) => {
+	pressed = targetElement(e);
+}, true);
+
+/**
+ * True when the drag being started began on one of a row's gutter
+ * controls. Rows drag by any point but those: the browser starts the
+ * drag from the row (the draggable ancestor) either way, so the start
+ * handlers refuse it themselves.
+ */
+export function startsOnControl(): boolean {
+	return pressed !== null && pressed.closest(".hide-toggle, .edit-item, .add-item") !== null;
+}
+
+/**
+ * True for the root row of a top-level column: the row that drags the
+ * whole column (dnd.ts) and folds it, open by default (folds.ts). The
+ * class is set by the renderer; the structure alone would not do — a
+ * folder previewing as a new column also sits at .column > ul > li.
+ */
+export function isColumnRoot(el: Element): boolean {
+	return el.classList.contains("column-root");
 }
 
 /** The bookmark row the event happened in, with its bookmark id. */
@@ -80,10 +123,10 @@ const ICON_PATHS = {
 	folder: "M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z",
 } as const;
 
-export type IconKind = keyof typeof ICON_PATHS | "grip";
+export type IconKind = keyof typeof ICON_PATHS;
 
 /**
- * A small single-color inline SVG icon. Font glyphs (👁︎ ✎︎ ⚙︎ ⠿ ⟳ ✕)
+ * A small single-color inline SVG icon. Font glyphs (👁︎ ✎︎ ⚙︎ ⟳ ✕)
  * render at wildly different sizes across platforms — Chromium picks a
  * color-emoji eye that overlaps its neighbours — so the UI draws its
  * own shapes: identical geometry everywhere, colored by currentColor.
@@ -93,22 +136,9 @@ export type IconKind = keyof typeof ICON_PATHS | "grip";
 export function svgIcon(kind: IconKind): SVGSVGElement {
 	const svg = document.createElementNS(SVG_NS, "svg");
 	svg.setAttribute("viewBox", "0 0 24 24");
-	if (kind === "grip") {
-		// A 2×3 dot grip, like the ⠿ it replaces.
-		for (const cy of [5, 12, 19]) {
-			for (const cx of [8.5, 15.5]) {
-				const dot = document.createElementNS(SVG_NS, "circle");
-				dot.setAttribute("cx", String(cx));
-				dot.setAttribute("cy", String(cy));
-				dot.setAttribute("r", "2");
-				svg.append(dot);
-			}
-		}
-	} else {
-		const path = document.createElementNS(SVG_NS, "path");
-		path.setAttribute("d", ICON_PATHS[kind]);
-		svg.append(path);
-	}
+	const path = document.createElementNS(SVG_NS, "path");
+	path.setAttribute("d", ICON_PATHS[kind]);
+	svg.append(path);
 	return svg;
 }
 
@@ -217,18 +247,17 @@ const GLYPH_ICONS: Record<string, IconKind> = {
 	"✎": "pencil",
 	"⚙": "gear",
 	"👁": "eye",
-	"⠿": "grip",
 };
 
 /**
  * Appends `text` to `el`, swapping the control glyphs the messages use
- * (✎︎ ⚙︎ 👁︎ ⠿) for the same inline SVG icons the controls draw — so
+ * (✎︎ ⚙︎ 👁︎) for the same inline SVG icons the controls draw — so
  * instructions show exactly what the page shows.
  */
 export function appendWithIcons(el: HTMLElement, text: string): void {
 	// U+FE0E is the (invisible) text-presentation selector the messages
 	// attach to the glyphs; it is matched and stripped along with them.
-	for (const part of text.split(/([✎⚙👁]\uFE0E?|⠿)/u)) {
+	for (const part of text.split(/([✎⚙👁]\uFE0E?)/u)) {
 		if (part === "") continue;
 		const kind = GLYPH_ICONS[part.replace("\uFE0E", "")];
 		if (kind === undefined) el.append(part);

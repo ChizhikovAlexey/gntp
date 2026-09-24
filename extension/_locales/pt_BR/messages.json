@@ -60,7 +60,7 @@
   "message": "Clique em ✎︎ para ativar o modo de edição."
  },
  "onboardSettings": {
-  "message": "Arraste a alça ⠿ para mover um favorito ou uma pasta.\nClique em 👁︎ para ocultar um favorito ou uma pasta.\nClique em ⚙︎ para abrir as configurações."
+  "message": "Arraste um favorito ou uma pasta para movê-lo.\nClique em 👁︎ para ocultar um favorito ou uma pasta.\nClique em ⚙︎ para abrir as configurações."
  },
  "onboardRoot": {
   "message": "Pasta raiz — qual pasta de favoritos esta página mostra.\nAqui também: colunas, fonte e idioma.\nClique em ⚙︎ novamente para fechar as configurações."

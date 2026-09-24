@@ -8,11 +8,12 @@
 // extension; the page is then re-rendered from the fresh tree.
 //
 // dragstart is delegated to the roots (#main and the shelf of hidden
-// columns) — only they hold drag handles; dragover, drop and dragend
-// live on the document, so releasing the mouse anywhere commits. The
-// drag state is module-level, so a drag crosses freely between the
-// roots — a bookmark can leave a shelved column for the matrix and
-// vice versa.
+// columns) — they hold the rows, which are the draggable elements: a
+// row drags by any point but its gutter controls. dragover, drop and
+// dragend live on the document, so releasing the mouse anywhere
+// commits. The drag state is module-level, so a drag crosses freely
+// between the roots — a bookmark can leave a shelved column for the
+// matrix and vice versa.
 //
 // The preview IS the pending result: every dragover is preventDefaulted
 // while a drag is active, and the drop applies exactly the standing
@@ -22,7 +23,7 @@
 
 import { isFirefox, moveBookmark } from "./api.js";
 import { editMode, saveLayout } from "./dnd.js";
-import { createEl, highlighter, targetElement } from "./util.js";
+import { createEl, highlighter, isColumnRoot, startsOnControl, targetElement } from "./util.js";
 
 let dragged: HTMLElement | null = null;
 // The dragged li's original list and next sibling, to undo the preview
@@ -51,18 +52,12 @@ let dropped = false;
 /** The re-render used after a move; injected to avoid an import cycle. */
 export function initItems(roots: readonly HTMLElement[], rebuild: () => Promise<void>): void {
 	const onDragstart = (e: DragEvent): void => {
-		const target = targetElement(e);
-		// Column handles belong to dnd.ts.
-		if (
-			target === null ||
-			!target.classList.contains("drag-handle") ||
-			target.classList.contains("column-handle")
-		) {
-			return;
-		}
-		const li = target.closest<HTMLElement>("li[data-id]");
-		if (li === null) return;
-		if (!editMode()) {
+		// The event fires at the draggable element: the row itself. Column
+		// root rows belong to dnd.ts; anything else (a link's own native
+		// drag outside edit mode) passes through untouched.
+		const li = targetElement(e);
+		if (!(li instanceof HTMLElement) || !li.matches("li[data-id]") || isColumnRoot(li)) return;
+		if (!editMode() || startsOnControl()) {
 			e.preventDefault();
 			return;
 		}

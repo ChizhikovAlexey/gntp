@@ -60,7 +60,7 @@
   "message": "Pulsa ✎︎ para activar el modo de edición."
  },
  "onboardSettings": {
-  "message": "Arrastra el asa ⠿ para mover un marcador o una carpeta.\nPulsa 👁︎ para ocultar un marcador o una carpeta.\nPulsa ⚙︎ para abrir los ajustes."
+  "message": "Arrastra un marcador o una carpeta para moverlo.\nPulsa 👁︎ para ocultar un marcador o una carpeta.\nPulsa ⚙︎ para abrir los ajustes."
  },
  "onboardRoot": {
   "message": "Carpeta raíz: qué carpeta de marcadores se muestra en esta página.\nAquí también: columnas, fuente e idioma.\nPulsa ⚙︎ de nuevo para cerrar los ajustes."

@@ -1,21 +1,32 @@
-// The air in the cards is not structure: when a row stops fitting the
-// page, it is what gives — the right side first, since nothing lives
-// there, and only then the gutter holding the eye, pencil, plus and
-// handle.
+// The air around the text is not structure: when a row stops fitting
+// the page, it is what gives, and nearly all of it goes before a title
+// loses a letter — the cards' right side first, since nothing lives
+// there, then the gap between columns, and last the gutter, down to a
+// bare nesting indent. Edit mode never asks for more: the controls
+// appear on one hovered row at a time, and that row's card borrows the
+// air to its left for them (newtab.css), so the matrix stays put in
+// both modes.
 //
 // The browser's own layout is the oracle: the probe pass lets the tracks
 // take their full content width, and every row spans the whole track
 // set, so one row's width is what the matrix asks for.
 
-/** The gutter at rest: room for the four controls plus breathing air. */
-const MAX_GUTTER = 4.6;
+/** The gutter at rest: room for a folder row's three controls, the air
+ * before the title (--text-air in newtab.css) and a hair of slack. */
+const MAX_GUTTER = 3.8;
 /** The right side's air at rest; #main's padding-right reserves the
  * difference from the gutter, so the text stays centered regardless. */
 const MAX_PAD = 3.5;
-/** The least the right side keeps, holding the backdrop off the text. */
-const MIN_PAD = 0.75;
-/** Below this the four controls no longer fit side by side. */
-const MIN_GUTTER = 4.5;
+/** The least the right side keeps: a hair between text and backdrop. */
+const MIN_PAD = 0.25;
+/** The gap between column tracks at rest; small, since the cards' own
+ * air already separates the texts. */
+const MAX_GAP = 1;
+/** The least the gap keeps, so the neighbours' cards never touch. */
+const MIN_GAP = 0.25;
+/** The gutter's floor: the nesting indent and the air before a column.
+ * Half a favicon still shows nested rows as nested. */
+const MIN_GUTTER = 0.5;
 /** Search resolution in em; finer steps are below one pixel of text. */
 const STEP = 0.1;
 
@@ -36,6 +47,7 @@ interface Probe {
 export function fitAir(main: HTMLElement): void {
 	setVar(main, "--gutter", MAX_GUTTER);
 	setVar(main, "--pad", MAX_PAD);
+	setVar(main, "--gap", MAX_GAP);
 	const row = main.querySelector(".grid-row");
 	if (row === null) return;
 	const probe: Probe = { main, row, style: getComputedStyle(main) };
@@ -43,6 +55,8 @@ export function fitAir(main: HTMLElement): void {
 	try {
 		if (fits(probe)) return;
 		search(probe, "--pad", MIN_PAD, MAX_PAD);
+		if (fits(probe)) return;
+		search(probe, "--gap", MIN_GAP, MAX_GAP);
 		if (fits(probe)) return;
 		search(probe, "--gutter", MIN_GUTTER, MAX_GUTTER);
 	} finally {

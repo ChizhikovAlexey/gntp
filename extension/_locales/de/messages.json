@@ -60,7 +60,7 @@
   "message": "Klicke auf ✎︎, um den Bearbeitungsmodus einzuschalten."
  },
  "onboardSettings": {
-  "message": "Ziehe am Griff ⠿, um ein Lesezeichen oder einen Ordner zu verschieben.\nKlicke auf 👁︎, um ein Lesezeichen oder einen Ordner auszublenden.\nKlicke auf ⚙︎, um die Einstellungen zu öffnen."
+  "message": "Ziehe ein Lesezeichen oder einen Ordner, um es zu verschieben.\nKlicke auf 👁︎, um ein Lesezeichen oder einen Ordner auszublenden.\nKlicke auf ⚙︎, um die Einstellungen zu öffnen."
  },
  "onboardRoot": {
   "message": "Wurzelordner – welcher Lesezeichenordner auf dieser Seite angezeigt wird.\nAußerdem: Spalten, Schrift und Sprache.\nKlicke erneut auf ⚙︎, um die Einstellungen zu schließen."

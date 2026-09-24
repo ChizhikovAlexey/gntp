@@ -16,16 +16,21 @@
 // matrix box lands the column on the shelf. Drop commits (cascading
 // overflow past the row limit), a cancelled drag restores the saved
 // layout. dragstart and dragend are delegated to #main and the shelf —
-// they hold the handles; dragover and drop live on the document, so
-// the standing preview commits wherever the mouse is released.
+// they hold the rows; dragover and drop live on the document, so the
+// standing preview commits wherever the mouse is released.
+//
+// A column drags by its root row: the row itself is the draggable
+// element, so any point of it but the gutter controls starts the drag.
+// Nested rows are items (items.ts) and drag the same way.
 
 import { moveBookmark } from "./api.js";
 import { storeHidden } from "./hidden.js";
 import {
 	createEl,
 	highlighter,
-	iconSpan,
+	isColumnRoot,
 	setClass,
+	startsOnControl,
 	storageGet,
 	storageSet,
 	targetElement,
@@ -43,12 +48,17 @@ export function editMode(): boolean {
 }
 
 /**
- * Enables or disables column drag and drop; the "editing" class
- * shows/hides the drag handles.
+ * Enables or disables editing: the "editing" class shows the row
+ * controls, and the rows become drag sources — in edit mode alone, so
+ * that outside it they stay ordinary blocks, whose text selects and
+ * whose links drag as links.
  */
 export function setEditMode(main: HTMLElement, enabled: boolean): void {
 	editing = enabled;
 	setClass(main, "editing", enabled);
+	for (const li of document.querySelectorAll<HTMLElement>(".tree li[data-id]")) {
+		li.draggable = enabled;
+	}
 }
 
 /** The saved matrix: rows of column ids. */
@@ -149,15 +159,6 @@ export function setColumnHidden(
 	saveLayout(main);
 }
 
-/** Marks a column as draggable by the handle placed in its root row. */
-export function makeDraggable(column: HTMLElement, id: string, rootLi: Element): void {
-	column.setAttribute("data-id", id);
-	// The extra class keeps items.ts from treating it as an item handle.
-	const handle = iconSpan("drag-handle column-handle", "grip");
-	handle.draggable = true;
-	rootLi.insertBefore(handle, rootLi.firstChild);
-}
-
 /**
  * The drag listeners; call once. `relayout` re-measures the matrix
  * after a drop — the preview moves columns between rows, which changes
@@ -171,11 +172,12 @@ export function initColumnDnd(
 	relayout: () => void,
 ): void {
 	const onDragstart = (e: DragEvent): void => {
+		// The event fires at the draggable element: the row itself.
 		const target = targetElement(e);
-		if (target === null || !target.classList.contains("column-handle")) return;
+		if (target === null || !isColumnRoot(target)) return;
 		const column = target.closest<HTMLElement>(".column");
 		if (column === null) return;
-		if (!editing) {
+		if (!editing || startsOnControl()) {
 			e.preventDefault();
 			return;
 		}
@@ -274,7 +276,8 @@ export function initColumnDnd(
 	});
 
 	const onDragend = (e: DragEvent): void => {
-		if (targetElement(e)?.classList.contains("column-handle") !== true) return;
+		const target = targetElement(e);
+		if (target === null || !isColumnRoot(target)) return;
 		into.set(null);
 		if (dragged !== null) {
 			dragged.classList.remove("dragging");
