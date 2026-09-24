@@ -27,24 +27,29 @@ select {
 	display: grid;
 	grid-template-columns: repeat(var(--cols, 1), minmax(0, max-content));
 	justify-content: center;
-	/* Small because the next column's gutter already separates the two
-	   texts; together they add up to the air between them. */
-	column-gap: 1em;
+	/* Small because the cards' own air already separates the two texts;
+	   together they add up to the air between them. fitAir() sets it,
+	   like --gutter and --pad. */
+	--gap: 1em;
+	column-gap: var(--gap);
 	/* Relative to the font size; 2 is HNTP's default item spacing. */
 	line-height: 2;
 	margin: 5vh 0 4vh;
-	padding-left: 24px;
-	/* Zero while the card is symmetric. Once fitAir() has taken air off
-	   the right side, the difference is reserved here as room the matrix
-	   cannot use: centering splits it evenly, so the matrix shifts left
-	   by half and the text — not the card — stays symmetric. */
-	padding-right: calc(24px + var(--gutter) - var(--pad));
+	/* The page margin; a hovered first-column row may borrow it. */
+	--edge: 24px;
+	padding-left: var(--edge);
+	/* The gutter's excess over the right side (0.3em at rest, more once
+	   fitAir() has taken air off the right) is reserved here as room the
+	   matrix cannot use: centering splits it evenly, so the matrix shifts
+	   left by half and the text — not the card — stays symmetric. */
+	padding-right: calc(var(--edge) + var(--gutter) - var(--pad));
 	/* The card's air. fitAir() shrinks it when the page runs short:
-	   --pad first, since nothing lives there, and only then --gutter,
-	   which holds the eye, pencil, plus and drag handle. The gutter is
-	   the wider of the two; the padding-right above reserves the
+	   --pad first, since nothing lives there, then --gap, and only then
+	   --gutter — down to a bare indent; the controls a hovered row shows
+	   in edit mode are not layout (see the card rules). The gutter is never
+	   the narrower of the two; the padding-right above reserves the
 	   difference, so the text itself stays centered. */
-	--gutter: 4.6em;
+	--gutter: 3.8em;
 	--pad: 3.5em;
 }
 /* The probe pass of fitAir(): tracks take their full content width, so
@@ -508,8 +513,8 @@ ul {
 }
 
 /* A row: the link is a full-width block, the nested folder list flows
-   below it; the eye and handle live absolutely positioned in the
-   row's left padding (the gutter), so no flex tricks are needed. */
+   below it; the controls live absolutely positioned in the row's left
+   padding (the gutter), so no flex tricks are needed. */
 .tree li {
 	position: relative;
 	/* The same in every mode, so nothing shifts when edit mode reveals
@@ -524,21 +529,99 @@ ul {
 	overflow: hidden;
 	text-overflow: ellipsis;
 }
-/* Links are inert while editing: clicks (any button) go nowhere and the
-   cursor stays an arrow — hovering still reaches the li card. */
+/* Links are inert while editing: clicks (any button) go nowhere and
+   hovering still reaches the li card — which is also what makes the
+   row, not the link, the drag source. */
 #main.editing a[href] {
 	pointer-events: none;
 }
+/* Rows drag by any point but their controls (the controls say
+   "pointer" for themselves below); the cursor tells so over the whole
+   row, folder header included. Rows are draggable in edit mode only
+   (setEditMode), the shelf being visible then alone. */
+.tree li[draggable="true"],
+.tree li[draggable="true"] > .folder {
+	cursor: grab;
+}
 
 /* One uniform card model: every li (bookmark row, folder block, column
-   root) is a card; hovering the innermost li shows the backdrop and its
-   gutter controls, vertically centered left of the card. */
+   root) is a card; hovering the innermost li — in the matrix while
+   editing, on the shelf always — shows the backdrop and its gutter
+   controls, vertically centered left of the card. The backdrop is a
+   pseudo-element behind the row's content, so the card can outgrow the
+   row (below) without touching its layout. */
 .dragging,
-#shelf li:hover:not(:has(li:hover)),
-#main.editing:not(:has(.dragging)) li:hover:not(:has(li:hover)) {
+:is(#main.editing:not(:has(.dragging)), #shelf) li:hover:not(:has(li:hover)) {
+	/* The backdrop's box (a dragged column is not positioned otherwise)
+	   and its stacking floor: behind the content, above the page. */
+	position: relative;
+	isolation: isolate;
+}
+.dragging::before,
+:is(#main.editing:not(:has(.dragging)), #shelf) li:hover:not(:has(li:hover))::before {
+	content: "";
+	position: absolute;
+	z-index: -1;
+	inset: 0 calc(-1 * var(--over, 0em)) 0 calc(-1 * var(--ext, 0em));
 	background: color-mix(in srgb, Canvas 60%, transparent);
 	outline: 1px solid color-mix(in srgb, CanvasText 25%, transparent);
 	border-radius: 6px;
+}
+
+/* The hovered row's card grows to the left when the gutter is short of
+   what its controls need — over air only: the gutters of its
+   ancestors, the gap between columns and the previous column's right
+   padding (or the page margin, in the first column). --air is that
+   room, per nesting depth; the growth is capped by it, and whatever
+   the cap leaves (a root row at the very floor) shifts the title
+   right instead — into the row's right padding, then over the air on
+   that side, the card growing with it, and only past that the title
+   is cut short. The shift is a transform, so the boxes the tracks are
+   sized from never change and the rest of the page stays put.
+   Declared on the hovered row alone: unhovered rows carry none of it. */
+:is(#main.editing:not(:has(.dragging)), #shelf) li:hover:not(:has(li:hover)) {
+	/* The air between the last control and the title. */
+	--text-air: 0.5em;
+	/* What the controls need before the title: the eye and the pencil
+	   (1em each, 0.1em apart), a folder row's plus (below), and the air. */
+	--need: calc(2.1em + var(--text-air));
+	--ext: clamp(0em, calc(var(--need) - var(--gutter)), var(--air));
+	--deficit: max(0em, calc(var(--need) - var(--gutter) - var(--ext)));
+	/* Where the title starts, from the row's left edge. */
+	--title: calc(var(--gutter) + var(--deficit));
+	/* How far the shifted content may run past the row's right edge:
+	   the gap and the next column's gutter — air on every line — and,
+	   for the last column, no more than the page's own margin. */
+	--over: min(max(0em, calc(var(--deficit) - var(--pad))), calc(var(--gap) + var(--gutter)));
+	/* The shifted content ends with the card; the extra pixel keeps the
+	   backdrop's outline. */
+	clip-path: inset(-1px calc(-1 * var(--over) - 1px) -1px calc(-1 * var(--ext) - 1px));
+}
+:is(#main.editing:not(:has(.dragging)), #shelf) li:hover:not(:has(li:hover)):has(> .add-item) {
+	--need: calc(3.2em + var(--text-air));
+}
+:is(#main.editing:not(:has(.dragging)), #shelf) li:hover:not(:has(li:hover)) > :is(a, ul) {
+	transform: translateX(var(--deficit));
+}
+/* The air beside a column: the gap and the neighbour's right padding,
+   or the page margin for the first column of a row. */
+.column {
+	--side: calc(var(--gap) + var(--pad));
+}
+.grid-row > .column:first-child {
+	--side: var(--edge);
+}
+/* Root rows have the side air alone; each nesting level adds its
+   parent's gutter. The general rule understates the third level and
+   deeper, which only have more. */
+:is(#main.editing:not(:has(.dragging)), #shelf) li:hover:not(:has(li:hover)) {
+	--air: calc(2 * var(--gutter) + var(--side));
+}
+:is(#main.editing:not(:has(.dragging)), #shelf) .column > ul > li:hover:not(:has(li:hover)) {
+	--air: var(--side);
+}
+:is(#main.editing:not(:has(.dragging)), #shelf) .column > ul > li > ul > li:hover:not(:has(li:hover)) {
+	--air: calc(var(--gutter) + var(--side));
 }
 
 /* The folder a dragged bookmark or column would drop into (its
@@ -549,22 +632,26 @@ ul {
 	border-radius: 6px;
 }
 
+/* The gutter controls: shown on the hovered card alone, so they never
+   catch a click or a drag meant for the row under them. */
 .hide-toggle,
 .edit-item,
-.add-item,
-.drag-handle {
+.add-item {
 	display: none;
 	position: absolute;
 	top: 50%;
 	transform: translateY(-50%);
 	user-select: none;
-	opacity: 0;
+	cursor: pointer;
+}
+:is(#main.editing:not(:has(.dragging)), #shelf) li:hover:not(:has(li:hover)) > :is(.hide-toggle, .edit-item, .add-item) {
+	display: inline;
 }
 /* All UI icons are inline SVGs (see svgIcon in util.ts): one size in
    every browser, unlike font glyphs. Click-inert, so the delegated
    listeners see the icon's host as the event target. */
 :is(
-	.hide-toggle, .edit-item, .add-item, .drag-handle,
+	.hide-toggle, .edit-item, .add-item,
 	#edit-toggle, #settings-toggle, #create-toggle, #settings .reset, #permission-banner .dismiss
 ) > svg {
 	display: block;
@@ -582,33 +669,18 @@ ul {
 	fill: currentColor;
 	vertical-align: -0.125em;
 }
-/* Anchored to the gutter's inner edge so all four stay inside it as it
-   shrinks; at the full 4.6em they resolve to 0.1em, 1.2em, 2.3em and
-   3.4em. */
+/* Right-aligned to the hovered row's title (--title): the pencil ends
+   --text-air before it, the eye 1.1em earlier, and a folder row's plus
+   another 1.1em before that. At the full 3.8em gutter they stand at
+   0.1em, 1.2em and 2.3em. */
+.add-item {
+	left: calc(var(--title) - var(--text-air) - 3.2em);
+}
 .hide-toggle {
-	left: max(0.1em, calc(var(--gutter) - 4.5em));
-	cursor: pointer;
+	left: calc(var(--title) - var(--text-air) - 2.1em);
 }
 .edit-item {
-	left: calc(var(--gutter) - 3.4em);
-	cursor: pointer;
-}
-.add-item {
-	left: calc(var(--gutter) - 2.3em);
-	cursor: pointer;
-}
-.drag-handle {
-	left: calc(var(--gutter) - 1.2em);
-	cursor: grab;
-}
-#main.editing .hide-toggle,
-#main.editing .edit-item,
-#main.editing .add-item,
-#main.editing .drag-handle {
-	display: inline;
-}
-#main.editing:not(:has(.dragging)) li:hover:not(:has(li:hover)) > :is(.hide-toggle, .edit-item, .add-item, .drag-handle) {
-	opacity: 1;
+	left: calc(var(--title) - var(--text-air) - 1em);
 }
 /* Hidden folders exist in the DOM but show only in edit mode. */
 #main:not(.editing) .hidden {
@@ -625,12 +697,13 @@ ul {
 	flex-wrap: wrap;
 	align-items: start;
 	justify-content: center;
-	column-gap: 1em;
+	--gap: 1em;
+	column-gap: var(--gap);
 	line-height: 2;
 	margin: 0 24px 4vh;
 	padding-top: 0.4em;
 	/* Its rows carry the same controls as the matrix ones. */
-	--gutter: 4.6em;
+	--gutter: 3.8em;
 	--pad: 3.5em;
 }
 /* The shelf's caption: the dashed separator moved here, with the name
@@ -662,19 +735,11 @@ ul {
 #shelf .column {
 	opacity: 0.5;
 }
-/* Shelf rows carry the full set of controls: the eye brings a column
-   back, hidden items can be edited and dragged — into other shelf
-   folders or out into the matrix — and whole columns drag back into
-   the matrix by their handle (equivalent to the eye showing them). */
-#shelf .hide-toggle,
-#shelf .edit-item,
-#shelf .add-item,
-#shelf .drag-handle {
-	display: inline;
-}
-#shelf li:hover:not(:has(li:hover)) > :is(.hide-toggle, .edit-item, .add-item, .drag-handle) {
-	opacity: 1;
-}
+/* Shelf rows carry the full set of controls (the card rules above):
+   the eye brings a column back, hidden items can be edited and dragged
+   — into other shelf folders or out into the matrix — and whole
+   columns drag back into the matrix by their root row (equivalent to
+   the eye showing them). */
 /* Shelf links must not navigate; folder headers (no href) still fold. */
 #shelf a[href] {
 	pointer-events: none;

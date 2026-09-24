@@ -14,7 +14,6 @@ import {
 	editMode,
 	initColumnDnd,
 	loadLayout,
-	makeDraggable,
 	normalizeRows,
 	setColumnHidden,
 	setEditMode,
@@ -30,6 +29,7 @@ import {
 	createEl,
 	fillFolderTree,
 	findNode,
+	type IconKind,
 	iconSpan,
 	setClass,
 	storageGet,
@@ -201,12 +201,7 @@ async function rebuild(): Promise<void> {
 			: [];
 	folders.push(...children.filter((n) => n.children !== undefined));
 
-	const columns = folders.map((node) => {
-		const column = folderColumn(ctx, node);
-		const rootLi = column.querySelector("li");
-		if (rootLi !== null) makeDraggable(column, node.id, rootLi);
-		return [node.id, column] as const;
-	});
+	const columns = folders.map((node) => [node.id, folderColumn(ctx, node)] as const);
 
 	// Hidden columns never occupy matrix cells: they go to the shelf
 	// after the matrix, so only the visible ones are laid out in rows.
@@ -271,9 +266,10 @@ function defaultRoot(root: BookmarkTreeNode): BookmarkTreeNode {
 /** A column showing one folder of the displayed root. */
 function folderColumn(ctx: Render, node: BookmarkTreeNode): HTMLElement {
 	const column = createEl("div", "column");
+	// The id names the column in the saved layout and to the drags.
+	column.setAttribute("data-id", node.id);
 	if (ctx.hidden.has(node.id)) column.classList.add("hidden");
 	const ul = createEl("ul");
-	// The folder row is moved via the column handle, not its own.
 	renderNode(ctx, ul, node, false);
 	column.append(ul);
 	return column;
@@ -284,7 +280,7 @@ function renderNode(
 	ctx: Render,
 	ul: HTMLElement,
 	node: BookmarkTreeNode,
-	withHandle: boolean,
+	nested: boolean,
 ): void {
 	// Separators are the only nodes never rendered; empty folders show —
 	// they are targets for moving bookmarks into.
@@ -293,13 +289,13 @@ function renderNode(
 	const li = createEl("li");
 	li.setAttribute("data-id", node.id);
 	if (node.index !== undefined) li.setAttribute("data-index", String(node.index));
-	if (withHandle) {
-		// Kept outside the <a>: Firefox lets the link's native drag win
-		// over a draggable child, which would break row reordering.
-		const handle = iconSpan("drag-handle", "grip");
-		handle.draggable = true;
-		li.append(handle);
-	}
+	// In edit mode the row is its own drag source, by any point but the
+	// gutter controls: a column's root row drags the whole column
+	// (dnd.ts), every other row drags as an item (items.ts). The link
+	// inside is pointer-inert then (newtab.css), so its native drag
+	// never competes.
+	li.draggable = editMode();
+	if (!nested) li.classList.add("column-root");
 
 	const a = createEl("a", undefined, node.title === "" ? (node.url ?? "") : node.title);
 	if (node.url !== undefined) {
@@ -320,25 +316,25 @@ function renderNode(
 		a.prepend(icon);
 	}
 	li.append(a);
-	// The row's gutter controls: the eye toggling the item's hidden
-	// state (hidden.ts), the pencil opening the item editor, and — on
-	// folder rows alone — the plus creating a new item inside (edit.ts).
-	// Bookmark rows keep the slot empty, so the columns of controls
-	// stay aligned.
+	// The row's gutter controls, right-aligned to the text so the eye and
+	// the pencil line up on every row: on folder rows alone the plus
+	// creating a new item inside (edit.ts) comes first, then the eye
+	// toggling the item's hidden state (hidden.ts) and the pencil opening
+	// the item editor.
+	if (node.children !== undefined) li.append(iconSpan("add-item", "plus"));
 	li.append(iconSpan("hide-toggle", "eye"));
 	li.append(iconSpan("edit-item", "pencil"));
-	if (node.children !== undefined) li.append(iconSpan("add-item", "plus"));
 	if (ctx.hidden.has(node.id)) li.classList.add("hidden");
 
 	if (node.children !== undefined) {
 		a.className = "folder";
-		// Nested folders (withHandle) default to collapsed, column roots
-		// to open; a deviation flips the default.
-		const collapsed = withHandle !== ctx.collapsed.has(node.id);
+		// Nested folders default to collapsed, column roots to open; a
+		// deviation flips the default.
+		const collapsed = nested !== ctx.collapsed.has(node.id);
 		if (collapsed) li.classList.add("collapsed");
 		// Collapsed nested folders render lazily (see expandFolder), so
 		// closed subtrees cost no DOM at all.
-		if (!collapsed || !withHandle) {
+		if (!collapsed || !nested) {
 			li.append(childList(ctx, node.children));
 		}
 	}
@@ -518,7 +514,7 @@ function buildSettingsUi(): void {
 function cornerButton(
 	head: HTMLElement,
 	id: string,
-	icon: Parameters<typeof svgIcon>[0],
+	icon: IconKind,
 	title: string,
 ): HTMLButtonElement {
 	const button = createEl("button");

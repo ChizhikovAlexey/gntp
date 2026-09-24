@@ -117,9 +117,15 @@ async function open(id: string, rebuild: () => Promise<void>): Promise<void> {
 	// Neither the tree root (browsers refuse items placed directly in
 	// it) nor the edited folder's own subtree can be the parent; they
 	// stay visible but grayed, keeping the tree's shape intact.
-	if (tree !== null) {
+	if (tree === null) {
+		// No tree, no choice: a stale list from the previous item would
+		// offer its folder — and move this item there on save.
+		u.folder.replaceChildren();
+	} else {
 		const banned = new Set([tree.id]);
-		if (node.children !== undefined) {
+		if (kind === "folder") {
+			// bookmarks.get() returns nodes without children; the subtree
+			// comes from the tree.
 			const self = findNode(tree, id);
 			if (self !== null) banSubtree(self, banned);
 		}
@@ -148,7 +154,11 @@ export async function openCreate(
 	editedParentId = null;
 	u.name.value = "";
 	u.url.value = "";
-	if (tree !== null) {
+	if (tree === null) {
+		// No tree, no choice (see open); the empty value makes the store
+		// refuse the item, which the form reports.
+		u.folder.replaceChildren();
+	} else {
 		fillFolderTree(u.folder, tree, (n) => n.id === tree.id);
 		const rootId = at ?? document.getElementById("main")?.getAttribute("data-root");
 		if (rootId !== null && rootId !== undefined) u.folder.value = rootId;
@@ -361,6 +371,13 @@ const HAS_SCHEME =
 	/^(?:[a-z][a-z0-9+.-]*:\/\/|about:|data:|javascript:|mailto:|file:|view-source:|chrome:|edge:|moz-extension:|chrome-extension:|place:)/i;
 
 /**
+ * A web address whose host looks complete — a dotted name or localhost,
+ * ended by the port, path or nothing. What the URL field's icon waits
+ * for while the address is being typed.
+ */
+const HOST_COMPLETE = /^https?:\/\/([^/?#]*\.[^/?#.]+|localhost)(?=$|[/:?#])/i;
+
+/**
  * The address as it should be stored: bare hosts like "yandex.ru" get
  * https:// in front — the store would refuse them as typed.
  */
@@ -404,7 +421,12 @@ function faviconSrc(page: string): string | null {
 function updateUrlIcon(): void {
 	if (ui === null) return;
 	hideUrlIcon();
-	const src = faviconSrc(normalizeUrl(ui.url.value));
+	const page = normalizeUrl(ui.url.value);
+	// Not before the host looks complete: an uncached origin is probed
+	// with a real request, which would otherwise go out for every
+	// prefix typed ("gi", "git", "github" …).
+	if (!HOST_COMPLETE.test(page)) return;
+	const src = faviconSrc(page);
 	if (src !== null) ui.urlIcon.src = src;
 }
 
@@ -430,9 +452,9 @@ async function submit(rebuild: () => Promise<void>): Promise<void> {
 		return;
 	}
 	if (editedId === null) return;
+	const bookmark = kind === "bookmark";
 	const changes: { title: string; url?: string } = { title: ui.name.value };
-	const hasUrl = !ui.urlRow.classList.contains("off");
-	if (hasUrl) changes.url = normalizeUrl(ui.url.value);
+	if (bookmark) changes.url = normalizeUrl(ui.url.value);
 	try {
 		await updateBookmark(editedId, changes);
 	} catch {
@@ -440,8 +462,8 @@ async function submit(rebuild: () => Promise<void>): Promise<void> {
 		// malformed URL — said on the field, and the editor stays open
 		// for a correction. A folder rename can only be refused wholesale
 		// (permanent folder, item deleted meanwhile).
-		const guilty = hasUrl ? ui.url : ui.name;
-		guilty.setCustomValidity(t(hasUrl ? "invalidUrl" : "cantSave"));
+		const guilty = bookmark ? ui.url : ui.name;
+		guilty.setCustomValidity(t(bookmark ? "invalidUrl" : "cantSave"));
 		guilty.reportValidity();
 		return;
 	}
@@ -452,6 +474,9 @@ async function submit(rebuild: () => Promise<void>): Promise<void> {
 		} catch {
 			ui.folder.setCustomValidity(t("cantSave"));
 			ui.folder.reportValidity();
+			// The rename above is already in the store: the page shows it
+			// while the editor stays open for the folder.
+			void rebuild();
 			return;
 		}
 	}
@@ -542,23 +567,25 @@ async function doDelete(rebuild: () => Promise<void>): Promise<void> {
 	if (ui === null || editedId === null) return;
 	const withContents = !ui.contentsRow.classList.contains("off");
 	try {
-		if (withContents && ui.contents.checked) {
-			await removeBookmarkTree(editedId);
-		} else if (withContents) {
+		if (withContents && !ui.contents.checked) {
 			// Keep the contents: spill them into the parent folder (at its
-			// end, in order), then delete the emptied folder itself.
+			// end, in order) before the folder itself goes.
 			if (editedParentId === null) throw new Error("no parent");
 			const node = await getSubTree(editedId);
 			for (const child of node?.children ?? []) {
 				await moveBookmark(child.id, { parentId: editedParentId });
 			}
-			await removeBookmark(editedId);
-		} else {
-			await removeBookmark(editedId);
 		}
+		// Folders always go as a tree: the plain removal refuses a folder
+		// that still holds anything, and Firefox's separators — never
+		// listed, never worth keeping — count.
+		if (kind === "folder") await removeBookmarkTree(editedId);
+		else await removeBookmark(editedId);
 	} catch {
 		// Refused (a permanent folder, say): said in place of the question.
 		ui.question.textContent = t("cantSave");
+		// Some of the spill may have landed: the page shows what did.
+		void rebuild();
 		return;
 	}
 	ui.form.hidePopover();

@@ -9,7 +9,7 @@
 // on HiDPI screens), shrinking multi-size ICOs from tens of kilobytes
 // to a few: less storage, smaller DOM strings, smaller decoded bitmaps.
 
-import { storageGet, storageRemove, storageSet } from "./util.js";
+import { storageGet, storageKeys, storageRemove, storageSet } from "./util.js";
 
 /**
  * Icons older than this are refreshed in the background while the old
@@ -32,7 +32,10 @@ const MAX_STORED_CHARS = 8 * 1024;
 
 // Strict mode = the host permission is granted: only instant cached
 // icons are ever rendered; misses stay blank and get cached for the
-// next open, so the page never shows icons loading.
+// next open, so the page never shows icons loading. Without the
+// permission nothing is fetched at all: cross-origin fetches would
+// fail, and recording those failures would hold the icons back for a
+// day after the permission is granted.
 let strictMode = false;
 
 export function setStrict(enabled: boolean): void {
@@ -112,19 +115,17 @@ export function cached(origin: string): Cached {
  * has opened the page before, even with no setting ever changed.
  */
 export function cachedAny(): boolean {
-	for (let i = 0; i < localStorage.length; i++) {
-		if (localStorage.key(i)?.startsWith("icon:") === true) return true;
-	}
-	return false;
+	return storageKeys("icon:").length > 0;
 }
 
 /**
  * Queues the origin's favicon to be fetched and cached after first
  * paint. `blank` says the row shows no icon at all meanwhile, so a
- * successful fetch is worth re-rendering for.
+ * successful fetch is worth re-rendering for. A no-op without the host
+ * permission (see strict mode above).
  */
 export function prefetch(origin: string, blank: boolean): void {
-	if (!inFlight.has(origin)) pending.set(origin, blank);
+	if (strictMode && !inFlight.has(origin)) pending.set(origin, blank);
 }
 
 /**
@@ -265,12 +266,7 @@ export async function shrinkLegacyEntries(): Promise<void> {
 	if (shrinking) return;
 	shrinking = true;
 	const RECODE_THRESHOLD = 2048;
-	const keys: string[] = [];
-	for (let i = 0; i < localStorage.length; i++) {
-		const key = localStorage.key(i);
-		if (key !== null && key.startsWith("icon:")) keys.push(key);
-	}
-	for (const key of keys) {
+	for (const key of storageKeys("icon:")) {
 		const entry = storageGet(key);
 		const separator = entry?.indexOf("|") ?? -1;
 		if (entry === null || separator < 0) continue;
